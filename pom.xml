@@ -22,6 +22,7 @@
         <module>purity-ploidy-estimator</module>
         <module>hmfslicer-builder</module>
         <module>rups-checker</module>
+        <module>bam-recovery</module>
     </modules>
 
     <properties>
@@ -45,6 +46,7 @@
         <jfreechart.version>1.0.14</jfreechart.version>
         <mysqlconnector.version>6.0.6</mysqlconnector.version>
         <apache.dbcp2.version>2.1.1</apache.dbcp2.version>
+        <twitter.elephantbird.version>4.15</twitter.elephantbird.version>
 
         <hmf-common.version>1</hmf-common.version>
         <patient-db.version>1.0</patient-db.version>
@@ -215,7 +217,12 @@
                 <artifactId>commons-dbcp2</artifactId>
                 <version>${apache.dbcp2.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.twitter.elephantbird</groupId>
+                <artifactId>elephant-bird</artifactId>
+                <version>${twitter.elephantbird.version}</version>
+                <type>pom</type>
+            </dependency>
         </dependencies>
     </dependencyManagement>
-
 </project>
