@@ -4,7 +4,6 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import com.google.common.collect.Lists;
 
@@ -18,12 +17,15 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
+import io.reactivex.Observable;
+import io.reactivex.schedulers.Schedulers;
+
 public final class BamRecovery {
     private static final Logger LOGGER = LogManager.getLogger(BamRecovery.class);
 
     private static final String INPUT_FILE = "in";
 
-    public static void main(String[] args) throws IOException, ParseException {
+    public static void main(String[] args) throws ParseException, IOException {
         final Options options = createOptions();
         final CommandLine cmd = createCommandLine(args, options);
         final String fileName = cmd.getOptionValue(INPUT_FILE);
@@ -32,15 +34,23 @@ public final class BamRecovery {
             formatter.printHelp("Bam-Recovery", options);
         } else {
             final BamFile bamFile = new BamFile(fileName);
-            final List<Archive> archives = bamFile.findArchives();
-            final List<Archive> truncatedArchives =
-                    archives.stream().filter(archive -> archive.size() != archive.actualSize()).collect(Collectors.toList());
-            final List<Archive> corruptedArchives = Lists.newArrayList();
-            for (final Archive archive : archives) {
-                if (archive.actualSize() == archive.size() && !Unzipper.tryUnzip(bamFile.file(), archive)) {
-                    corruptedArchives.add(archive);
+            LOGGER.info("reading archives...");
+
+            final List<ArchiveHeader> truncatedArchives = Lists.newArrayList();
+            final List<ArchiveHeader> corruptedArchives = Lists.newArrayList();
+
+            bamFile.findArchives().doOnNext(archive -> {
+                if (archive.isTruncated()) {
+                    truncatedArchives.add(archive.header());
                 }
-            }
+            }).buffer(Runtime.getRuntime().availableProcessors()).flatMap(buffer -> {
+                final Observable<Archive> buffered = Observable.fromIterable(buffer);
+                final List<Archive> filtered = buffered.flatMap(archive2 -> Observable.just(archive2)
+                        .subscribeOn(Schedulers.computation())
+                        .filter(archive -> !archive.isTruncated() && !Unzipper.canUnzip(archive))).toList().blockingGet();
+                return Observable.fromIterable(filtered);
+            }).blockingSubscribe(archive -> corruptedArchives.add(archive.header()), LOGGER::error, () -> LOGGER.info("done."));
+
             writeOutput(truncatedArchives, fileName + ".truncated.csv");
             writeOutput(corruptedArchives, fileName + ".corrupted.csv");
         }
@@ -59,9 +69,9 @@ public final class BamRecovery {
         return parser.parse(options, args);
     }
 
-    private static void writeOutput(@NotNull final List<Archive> corruptedArchives, @NotNull final String csvOutPath) throws IOException {
+    private static void writeOutput(@NotNull final List<ArchiveHeader> archives, @NotNull final String csvOutPath) throws IOException {
         final BufferedWriter writer = new BufferedWriter(new FileWriter(csvOutPath, false));
-        for (final Archive archive : corruptedArchives) {
+        for (final ArchiveHeader archive : archives) {
             writer.write(archive.startOffset() + "," + archive.endOffset() + "," + archive.size() + "," + archive.actualSize() + "\n");
         }
         writer.close();

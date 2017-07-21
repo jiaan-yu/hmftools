@@ -9,18 +9,16 @@ import org.jetbrains.annotations.Nullable;
              passAnnotations = { NotNull.class, Nullable.class })
 abstract class Archive {
 
-    abstract long startOffset();
+    abstract ArchiveHeader header();
 
-    abstract long endOffset();
+    abstract byte[] payload();
 
-    abstract int size();
-
-    long actualSize() {
-        return endOffset() - startOffset();
+    boolean isTruncated() {
+        return header().isTruncated();
     }
 
     @Override
     public String toString() {
-        return "" + startOffset() + "-" + endOffset() + "(" + size() + ")";
+        return header().toString();
     }
 }

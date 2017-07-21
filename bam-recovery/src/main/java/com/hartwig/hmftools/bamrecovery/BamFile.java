@@ -1,26 +1,25 @@
 package com.hartwig.hmftools.bamrecovery;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.MappedByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.collect.Lists;
 import com.twitter.elephantbird.util.StreamSearcher;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
-public class BamFile {
+import io.reactivex.Observable;
+import io.reactivex.ObservableEmitter;
+
+class BamFile {
 
     private static final Logger LOGGER = LogManager.getLogger(BamFile.class);
 
@@ -29,6 +28,7 @@ public class BamFile {
     static final byte[] HEADER = new BigInteger(HEADER_BINARY, 2).toByteArray();
     static final int BLOCK_SIZE_LENGTH = 2;
     static final int BLOCK_FOOTER_LENGTH = 8;
+    private static final int FOOTER_FIELD_LENGTH = 4;
 
     @NotNull
     private final File file;
@@ -37,22 +37,42 @@ public class BamFile {
         this.file = new File(fileName);
     }
 
-    long findNextOffset(@NotNull final InputStream archive, @NotNull AtomicLong currentStreamPosition) throws IOException {
+    long findNextOffset(@NotNull final FileChannel fileChannel) throws IOException {
         final StreamSearcher searcher = new StreamSearcher(HEADER);
-        final long bytesReadForNextMatch = searcher.search(archive);
+        final long currentPosition = fileChannel.position();
+        final InputStream fileInputStream = Channels.newInputStream(fileChannel);
+        final long bytesReadForNextMatch = searcher.search(fileInputStream);
         if (bytesReadForNextMatch != -1) {
-            final long offset = bytesReadForNextMatch + currentStreamPosition.get() - HEADER.length;
-            currentStreamPosition.set(currentStreamPosition.get() + bytesReadForNextMatch);
-            return offset;
+            return bytesReadForNextMatch + currentPosition - HEADER.length;
         }
-        currentStreamPosition.set(file.length());
         return -1;
     }
 
-    private int extractBlockSize(@NotNull final InputStream archive, @NotNull AtomicLong currentStreamPosition) throws IOException {
-        final long blockSize = readLittleEndianField(archive, BLOCK_SIZE_LENGTH);
-        currentStreamPosition.set(currentStreamPosition.get() + BLOCK_SIZE_LENGTH);
-        return (int) blockSize;
+    private int extractBlockSize(@NotNull final FileChannel fileChannel) throws IOException {
+        return extractBuffer(fileChannel, BLOCK_SIZE_LENGTH).getShort();
+    }
+
+    private int extractFooterField(@NotNull final FileChannel fileChannel) throws IOException {
+        return extractBuffer(fileChannel, FOOTER_FIELD_LENGTH).getInt();
+    }
+
+    private ByteBuffer extractBuffer(@NotNull final FileChannel fileChannel, final int length) throws IOException {
+        final ByteBuffer byteBuffer = ByteBuffer.allocate(length).order(ByteOrder.LITTLE_ENDIAN);
+        fileChannel.read(byteBuffer);
+        byteBuffer.rewind();
+        return byteBuffer;
+    }
+
+    private byte[] extractHeader(@NotNull final FileChannel fileChannel) throws IOException {
+        return extractBuffer(fileChannel, HEADER.length).array();
+    }
+
+    private Archive extractArchive(@NotNull final FileChannel fileChannel, @NotNull final ArchiveHeader header) throws IOException {
+        final ByteBuffer blockSizeBuffer = ByteBuffer.allocate(header.payloadSize());
+        fileChannel.position(header.payloadPosition());
+        fileChannel.read(blockSizeBuffer);
+        final byte[] payload = blockSizeBuffer.array();
+        return ImmutableArchive.of(header, payload);
     }
 
     private static long readLittleEndianField(@NotNull final InputStream archive, final int bytes) throws IOException {
@@ -69,49 +89,59 @@ public class BamFile {
         }
     }
 
-    List<Archive> findArchives() throws IOException {
-        LOGGER.info("finding archives...");
-        final List<Archive> archives = Lists.newArrayList();
-        final byte[] bytesArr = new byte[HEADER.length];
-        final RandomAccessFile randomFile = new RandomAccessFile(file, "r");
-        final FileChannel channel = randomFile.getChannel();
-        final InputStream archive = new FileInputStream(file);
-        final AtomicLong currentStreamPosition = new AtomicLong(0);
+    Observable<Archive> findArchives() {
+        return Observable.create((final ObservableEmitter<Archive> observer) -> {
+            try {
+                final RandomAccessFile randomFile = new RandomAccessFile(file, "r");
+                final FileChannel fileChannel = randomFile.getChannel();
+                long previousHeaderOffset = findNextOffset(fileChannel);
+                while ((previousHeaderOffset != -1 || previousHeaderOffset != file.length()) && !observer.isDisposed()) {
+                    //                    LOGGER.info("reading archive at " + previousHeaderOffset);
+                    final int currentBlockSize = extractBlockSize(fileChannel) + 1;
+                    long nextHeaderOffset = previousHeaderOffset + currentBlockSize;
 
-        long previousHeaderOffset = findNextOffset(archive, currentStreamPosition);
-        while (previousHeaderOffset != -1 || previousHeaderOffset != file.length()) {
-            final int currentBlockSize = extractBlockSize(archive, currentStreamPosition) + 1;
-            final long expectedNextHeaderOffset = currentStreamPosition.get() + currentBlockSize - HEADER.length - BLOCK_SIZE_LENGTH;
-            if (expectedNextHeaderOffset == file.length()) {
-                LOGGER.info("Reached end of file.");
-                if (currentBlockSize != 28) {
-                    LOGGER.warn("EOF maker block should have a size of 28, but was: " + currentBlockSize);
+                    if (nextHeaderOffset == file.length()) {
+                        LOGGER.info("Reached end of file.");
+                        if (currentBlockSize != 28) {
+                            LOGGER.warn("EOF maker block should have a size of 28, but was: " + currentBlockSize);
+                        }
+                        break;
+                    }
+                    fileChannel.position(nextHeaderOffset);
+                    if (equalsHeader(extractHeader(fileChannel))) {
+                        // header is in expected position
+                        fileChannel.position(nextHeaderOffset - BLOCK_FOOTER_LENGTH);
+                        final int expectedCrc = extractFooterField(fileChannel);
+                        final int uncompressedSize = extractFooterField(fileChannel);
+                        final ArchiveHeader header =
+                                ImmutableArchiveHeader.of(previousHeaderOffset, nextHeaderOffset, currentBlockSize, expectedCrc,
+                                        uncompressedSize);
+
+                        final Archive archive = extractArchive(fileChannel, header);
+                        if (!observer.isDisposed()) {
+                            observer.onNext(archive);
+                        }
+                        fileChannel.position(nextHeaderOffset + HEADER.length);
+                    } else {
+                        nextHeaderOffset = findNextOffset(fileChannel);
+                        final ArchiveHeader header =
+                                ImmutableArchiveHeader.of(previousHeaderOffset, nextHeaderOffset, currentBlockSize, -1, -1);
+                        LOGGER.info("Truncated archive: " + previousHeaderOffset + " -> " + nextHeaderOffset + ". Expected size: "
+                                + currentBlockSize + ", actual size: " + (nextHeaderOffset - previousHeaderOffset));
+                        if (!observer.isDisposed()) {
+                            observer.onNext(ImmutableArchive.of(header, new byte[0]));
+                        }
+                    }
+                    previousHeaderOffset = nextHeaderOffset;
                 }
-                break;
-            }
-            final MappedByteBuffer mappedByteBuffer = channel.map(FileChannel.MapMode.READ_ONLY, expectedNextHeaderOffset, HEADER.length);
-            mappedByteBuffer.get(bytesArr, 0, HEADER.length);
-            if (equalsHeader(bytesArr)) {
-                // header is in expected position
-                long skipped = archive.skip(expectedNextHeaderOffset - currentStreamPosition.get() + HEADER.length);
-                if (skipped < expectedNextHeaderOffset - currentStreamPosition.get()) {
-                    LOGGER.warn("skipped less than expected: " + skipped + " instead of " + (expectedNextHeaderOffset
-                            - currentStreamPosition.get()));
+                fileChannel.close();
+                if (!observer.isDisposed()) {
+                    observer.onComplete();
                 }
-                archives.add(ImmutableArchive.of(previousHeaderOffset, expectedNextHeaderOffset, currentBlockSize));
-                previousHeaderOffset = expectedNextHeaderOffset;
-                currentStreamPosition.set(expectedNextHeaderOffset + HEADER.length);
-            } else {
-                final long nextOffset = findNextOffset(archive, currentStreamPosition);
-                LOGGER.info("Truncated archive: " + previousHeaderOffset + " -> " + nextOffset + ". Expected size: " + currentBlockSize
-                        + ", actual size: " + (nextOffset - previousHeaderOffset));
-                archives.add(ImmutableArchive.of(previousHeaderOffset, nextOffset, currentBlockSize));
-                previousHeaderOffset = nextOffset;
+            } catch (final Exception e) {
+                observer.onError(e);
             }
-        }
-        channel.close();
-        LOGGER.info("done. found " + archives.size() + " archives.");
-        return archives;
+        });
     }
 
     private boolean equalsHeader(final byte[] bytesArray) {
@@ -121,10 +151,5 @@ public class BamFile {
             }
         }
         return true;
-    }
-
-    @NotNull
-    public File file() {
-        return file;
     }
 }
