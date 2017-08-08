@@ -38,7 +38,6 @@ class PatientDataSource {
     private PatientDataSource() {
     }
 
-
     @NotNull
     static JRDataSource fromVariants(@NotNull final List<VariantReport> variants,
             @NotNull final HmfReporterData reporterData) {
@@ -64,7 +63,7 @@ class PatientDataSource {
 
         for (final CopyNumberReport copyNumber : copyNumbers) {
             copyNumberDatasource.add(copyNumber.chromosome(), copyNumber.chromosomeBand(), copyNumber.gene(),
-                    copyNumber.resolveType(), Integer.toString(copyNumber.copyNumber()));
+                    copyNumber.description(), Integer.toString(copyNumber.copyNumber()));
         }
         return copyNumberDatasource;
     }

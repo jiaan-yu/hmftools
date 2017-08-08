@@ -17,7 +17,7 @@ import com.hartwig.hmftools.common.variant.VariantType;
 import org.jetbrains.annotations.NotNull;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
-import org.jooq.InsertValuesStep13;
+import org.jooq.InsertValuesStep21;
 import org.jooq.Record;
 import org.jooq.Result;
 
@@ -53,6 +53,10 @@ class ComprehensiveSomaticVariantDAO {
                     .position(record.getValue(COMPREHENSIVESOMATICVARIANT.POSITION))
                     .ref(ref)
                     .alt(alt)
+                    .gene(record.getValue(COMPREHENSIVESOMATICVARIANT.GENE))
+                    .cosmicId(record.getValue(COMPREHENSIVESOMATICVARIANT.COSMICID))
+                    .dbsnpId(record.getValue(COMPREHENSIVESOMATICVARIANT.DBSNPID))
+                    .effect(record.getValue(COMPREHENSIVESOMATICVARIANT.EFFECT))
                     .filter(record.getValue(COMPREHENSIVESOMATICVARIANT.FILTER))
                     .alleleReadCount(record.getValue(COMPREHENSIVESOMATICVARIANT.ALLELEREADCOUNT))
                     .totalReadCount(record.getValue(COMPREHENSIVESOMATICVARIANT.TOTALREADCOUNT))
@@ -60,6 +64,10 @@ class ComprehensiveSomaticVariantDAO {
                     .adjustedVAF(record.getValue(COMPREHENSIVESOMATICVARIANT.ADJUSTEDVAF))
                     .adjustedCopyNumber(record.getValue(COMPREHENSIVESOMATICVARIANT.ADJUSTEDCOPYNUMBER))
                     .trinucleotideContext(record.getValue(COMPREHENSIVESOMATICVARIANT.TRINUCLEOTIDECONTEXT))
+                    .microhomology(record.getValue(COMPREHENSIVESOMATICVARIANT.MICROHOMOLOGY))
+                    .repeatSequence(record.getValue(COMPREHENSIVESOMATICVARIANT.REPEATSEQUENCE))
+                    .repeatCount(record.getValue(COMPREHENSIVESOMATICVARIANT.REPEATCOUNT))
+                    .refGenomeContext(record.getValue(COMPREHENSIVESOMATICVARIANT.REFGENOMECONTEXT))
                     .type(VariantType.fromRefAlt(ref, alt))
                     .build();
 
@@ -75,38 +83,54 @@ class ComprehensiveSomaticVariantDAO {
         context.delete(COMPREHENSIVESOMATICVARIANT).where(COMPREHENSIVESOMATICVARIANT.SAMPLEID.eq(sample)).execute();
 
         for (List<EnrichedSomaticVariant> splitRegions : Iterables.partition(regions, BATCH_INSERT_SIZE)) {
-            InsertValuesStep13 inserter = context.insertInto(COMPREHENSIVESOMATICVARIANT,
+            InsertValuesStep21 inserter = context.insertInto(COMPREHENSIVESOMATICVARIANT,
                     COMPREHENSIVESOMATICVARIANT.SAMPLEID,
                     COMPREHENSIVESOMATICVARIANT.CHROMOSOME,
                     COMPREHENSIVESOMATICVARIANT.POSITION,
                     COMPREHENSIVESOMATICVARIANT.FILTER,
                     COMPREHENSIVESOMATICVARIANT.REF,
                     COMPREHENSIVESOMATICVARIANT.ALT,
+                    COMPREHENSIVESOMATICVARIANT.GENE,
+                    COMPREHENSIVESOMATICVARIANT.COSMICID,
+                    COMPREHENSIVESOMATICVARIANT.DBSNPID,
+                    COMPREHENSIVESOMATICVARIANT.EFFECT,
                     COMPREHENSIVESOMATICVARIANT.ALLELEREADCOUNT,
                     COMPREHENSIVESOMATICVARIANT.TOTALREADCOUNT,
                     COMPREHENSIVESOMATICVARIANT.ADJUSTEDCOPYNUMBER,
                     COMPREHENSIVESOMATICVARIANT.ADJUSTEDVAF,
                     COMPREHENSIVESOMATICVARIANT.HIGHCONFIDENCE,
                     COMPREHENSIVESOMATICVARIANT.TRINUCLEOTIDECONTEXT,
+                    COMPREHENSIVESOMATICVARIANT.MICROHOMOLOGY,
+                    COMPREHENSIVESOMATICVARIANT.REPEATSEQUENCE,
+                    COMPREHENSIVESOMATICVARIANT.REPEATCOUNT,
+                    COMPREHENSIVESOMATICVARIANT.REFGENOMECONTEXT,
                     COMPREHENSIVESOMATICVARIANT.MODIFIED);
             splitRegions.forEach(x -> addRecord(timestamp, inserter, sample, x));
             inserter.execute();
         }
     }
 
-    private void addRecord(Timestamp timestamp, InsertValuesStep13 inserter, String sample, EnrichedSomaticVariant region) {
+    private void addRecord(Timestamp timestamp, InsertValuesStep21 inserter, String sample, EnrichedSomaticVariant region) {
         inserter.values(sample,
                 region.chromosome(),
                 region.position(),
                 filter(region.filter()),
                 region.ref(),
                 region.alt(),
+                region.gene(),
+                region.cosmicId(),
+                region.dbsnpId(),
+                region.effect(),
                 region.alleleReadCount(),
                 region.totalReadCount(),
                 region.adjustedCopyNumber(),
                 region.adjustedVAF(),
                 region.highConfidenceRegion(),
                 region.trinucleotideContext(),
+                region.microhomology(),
+                region.repeatSequence(),
+                region.repeatCount(),
+                region.refGenomeContext(),
                 timestamp);
     }
 

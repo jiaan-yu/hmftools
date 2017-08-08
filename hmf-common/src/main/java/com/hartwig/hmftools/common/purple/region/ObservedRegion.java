@@ -1,5 +1,6 @@
 package com.hartwig.hmftools.common.purple.region;
 
+import com.hartwig.hmftools.common.copynumber.freec.FreecStatus;
 import com.hartwig.hmftools.common.purple.segment.StructuralVariantSupport;
 import com.hartwig.hmftools.common.region.GenomeRegion;
 
@@ -13,13 +14,11 @@ public interface ObservedRegion extends GenomeRegion {
 
     double observedBAF();
 
+    int observedTumorRatioCount();
+
     double observedTumorRatio();
 
     double observedNormalRatio();
 
-    double observedGCContent();
-
-    double observedNonNPercentage();
-
-    double observedMappablePercentage();
+    FreecStatus status();
 }

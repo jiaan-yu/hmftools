@@ -2,10 +2,10 @@ package com.hartwig.hmftools.common.purple.region;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.hartwig.hmftools.common.copynumber.freec.FreecStatus;
 import com.hartwig.hmftools.common.numeric.Doubles;
 import com.hartwig.hmftools.common.purple.BAFUtils;
 import com.hartwig.hmftools.common.purple.PurityAdjuster;
@@ -33,7 +33,9 @@ public class FittedRegionFactory {
     @NotNull
     public List<FittedRegion> fitRegion(final double purity, final double normFactor,
             @NotNull final Collection<ObservedRegion> observedRegions) {
-        return observedRegions.stream().map(x -> fitRegion(purity, normFactor, x)).collect(Collectors.toList());
+
+        final Predicate<ObservedRegion> valid = observedRegion -> gender == Gender.MALE || !observedRegion.chromosome().equals("Y");
+        return observedRegions.stream().filter(valid).map(x -> fitRegion(purity, normFactor, x)).collect(Collectors.toList());
     }
 
     @NotNull
@@ -47,7 +49,6 @@ public class FittedRegionFactory {
 
         ImmutableFittedRegion.Builder builder = ImmutableFittedRegion.builder()
                 .from(observedRegion)
-                .status(FreecStatus.fromNormalRatio(observedRegion.observedNormalRatio()))
                 .broadBAF(0)
                 .broadTumorCopyNumber(0)
                 .segmentBAF(0)

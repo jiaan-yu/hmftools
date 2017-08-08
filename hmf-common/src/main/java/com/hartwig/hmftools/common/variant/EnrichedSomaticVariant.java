@@ -16,17 +16,27 @@ public abstract class EnrichedSomaticVariant implements Variant {
 
     public abstract int alleleReadCount();
 
+    public abstract String microhomology();
+
+    public abstract String refGenomeContext();
+
+    public abstract String repeatSequence();
+
+    public abstract String gene();
+
+    public abstract String cosmicId();
+
+    public abstract String dbsnpId();
+
+    public abstract String effect();
+
+    public abstract int repeatCount();
+
+    public abstract double adjustedCopyNumber();
+
+    public abstract double adjustedVAF();
+
     public double alleleFrequency() {
         return (double) alleleReadCount() / totalReadCount();
-    }
-
-    @Value.Default
-    public double adjustedCopyNumber() {
-        return 0;
-    }
-
-    @Value.Default
-    public double adjustedVAF() {
-        return 0;
     }
 }

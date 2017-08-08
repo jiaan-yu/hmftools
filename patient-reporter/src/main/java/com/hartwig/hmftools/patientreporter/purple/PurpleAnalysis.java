@@ -2,19 +2,18 @@ package com.hartwig.hmftools.patientreporter.purple;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
-import com.hartwig.hmftools.common.copynumber.CopyNumber;
+import com.hartwig.hmftools.common.gene.GeneCopyNumber;
 import com.hartwig.hmftools.common.purple.PurityAdjuster;
-import com.hartwig.hmftools.common.purple.copynumber.ImmutablePurpleCopyNumber;
 import com.hartwig.hmftools.common.purple.copynumber.PurpleCopyNumber;
 import com.hartwig.hmftools.common.purple.gender.Gender;
 import com.hartwig.hmftools.common.purple.purity.FittedPurity;
 import com.hartwig.hmftools.common.purple.purity.FittedPurityScore;
 import com.hartwig.hmftools.common.region.GenomeRegionSelector;
 import com.hartwig.hmftools.common.region.GenomeRegionSelectorFactory;
+import com.hartwig.hmftools.patientreporter.copynumber.CopyNumberAnalysis;
+import com.hartwig.hmftools.patientreporter.copynumber.CopyNumberReport;
 import com.hartwig.hmftools.patientreporter.variants.ImmutableVariantReport;
 import com.hartwig.hmftools.patientreporter.variants.VariantReport;
 
@@ -37,21 +36,23 @@ public abstract class PurpleAnalysis {
     public abstract List<PurpleCopyNumber> copyNumbers();
 
     @NotNull
-    public List<CopyNumber> ploidyAdjustedCopyNumbers() {
-        return copyNumbers().stream().map(x -> ploidyAdjusted(fittedPurity().ploidy(), x)).collect(Collectors.toList());
+    public abstract List<GeneCopyNumber> geneCopyNumbers();
+
+    @NotNull
+    public CopyNumberAnalysis copyNumberAnalysis() {
+        return new CopyNumberAnalysis(geneCopyNumbers().size(), copyNumberReport());
     }
 
     @NotNull
-    public List<VariantReport> enrich(@NotNull List<VariantReport> variants) {
-
+    public List<VariantReport> enrich(@NotNull final List<VariantReport> variants) {
         final List<VariantReport> result = Lists.newArrayList();
         final PurityAdjuster purityAdjuster = new PurityAdjuster(Gender.MALE, fittedPurity());
         final GenomeRegionSelector<PurpleCopyNumber> copyNumberSelector = GenomeRegionSelectorFactory.create(copyNumbers());
 
-        for (VariantReport variant : variants) {
+        for (final VariantReport variant : variants) {
             final Optional<PurpleCopyNumber> optionalCopyNumber = copyNumberSelector.select(variant);
             if (optionalCopyNumber.isPresent()) {
-                PurpleCopyNumber copyNumber = optionalCopyNumber.get();
+                final PurpleCopyNumber copyNumber = optionalCopyNumber.get();
                 double adjustedVAF =
                         Math.min(1, purityAdjuster.purityAdjustedVAF(copyNumber.averageTumorCopyNumber(), variant.alleleFrequency()));
                 result.add(ImmutableVariantReport.builder().from(variant).baf(copyNumber.descriptiveBAF()).impliedVAF(adjustedVAF).build());
@@ -68,11 +69,7 @@ public abstract class PurpleAnalysis {
     }
 
     @NotNull
-    @VisibleForTesting
-    static CopyNumber ploidyAdjusted(final double ploidy, final @NotNull PurpleCopyNumber copyNumber) {
-        double adjustedCopyNumber =
-                copyNumber.value() <= 1 ? copyNumber.averageTumorCopyNumber() : copyNumber.averageTumorCopyNumber() / ploidy * 2;
-
-        return ImmutablePurpleCopyNumber.builder().from(copyNumber).averageTumorCopyNumber(adjustedCopyNumber).build();
+    private List<CopyNumberReport> copyNumberReport() {
+        return PurpleCopyNumberReportFactory.createReport(fittedPurity().ploidy(), geneCopyNumbers());
     }
 }
