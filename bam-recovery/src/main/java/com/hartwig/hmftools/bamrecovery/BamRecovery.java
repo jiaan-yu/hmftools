@@ -1,8 +1,10 @@
 package com.hartwig.hmftools.bamrecovery;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.List;
 
 import com.google.common.collect.Lists;
@@ -24,6 +26,7 @@ public final class BamRecovery {
     private static final Logger LOGGER = LogManager.getLogger(BamRecovery.class);
 
     private static final String INPUT_FILE = "in";
+    private static final String OUTPUT_DIR = "slices";
 
     public static void main(String[] args) throws ParseException, IOException {
         final Options options = createOptions();
@@ -53,6 +56,11 @@ public final class BamRecovery {
 
             writeOutput(truncatedArchives, fileName + ".truncated.csv");
             writeOutput(corruptedArchives, fileName + ".corrupted.csv");
+            final List<ArchiveHeader> invalidArchives = Lists.newArrayList();
+            invalidArchives.addAll(truncatedArchives);
+            invalidArchives.addAll(corruptedArchives);
+            invalidArchives.sort(Comparator.comparing(ArchiveHeader::startOffset));
+            writeScript(invalidArchives, fileName, "cutBam.sh");
         }
     }
 
@@ -76,6 +84,40 @@ public final class BamRecovery {
         }
         writer.close();
         LOGGER.info("Written data to " + csvOutPath);
+    }
+
+    private static void writeScript(@NotNull final List<ArchiveHeader> archives, @NotNull final String inputFile,
+            @NotNull final String scriptPath) throws IOException {
+        final BufferedWriter writer = new BufferedWriter(new FileWriter(scriptPath, false));
+        writer.write("#!/usr/bin/env bash\n");
+        writer.write("mkdir \"" + OUTPUT_DIR + "\"\n\n");
+        long currentPosition = 0;
+        for (final ArchiveHeader archive : archives) {
+            writer.write(cutArchiveCommands(archive, currentPosition, inputFile));
+            currentPosition = archive.startOffset() + archive.actualSize();
+        }
+        if (archives.size() > 0) {
+            writer.write(cutLastChunk(currentPosition, inputFile));
+        }
+        writer.close();
+        LOGGER.info("Written data to " + scriptPath);
+    }
+
+    private static String cutArchiveCommands(@NotNull final ArchiveHeader header, final long currentPosition,
+            @NotNull final String inputFile) {
+        final long goodChunkSize = header.startOffset() - currentPosition;
+        final String cutGoodChunk =
+                "dd bs=1 skip=" + currentPosition + " count=" + goodChunkSize + " if=" + inputFile + " of=" + OUTPUT_DIR + File.separator
+                        + inputFile + "." + currentPosition + ".bam" + "\n";
+        final String cutBadChunk =
+                "dd bs=1 skip=" + header.startOffset() + " count=" + header.actualSize() + " if=" + inputFile + " of=" + OUTPUT_DIR
+                        + File.separator + inputFile + "." + header.startOffset() + ".bad" + "\n";
+        return cutGoodChunk + cutBadChunk;
+    }
+
+    private static String cutLastChunk(final long currentPosition, @NotNull final String inputFile) {
+        return "dd bs=1 skip=" + currentPosition + " if=" + inputFile + " of=" + OUTPUT_DIR + File.separator + inputFile + "."
+                + currentPosition + ".bam" + "\n";
     }
 
 }
