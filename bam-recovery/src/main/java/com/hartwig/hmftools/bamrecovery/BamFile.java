@@ -37,7 +37,8 @@ class BamFile {
         this.file = new File(fileName);
     }
 
-    long findNextOffset(@NotNull final FileChannel fileChannel) throws IOException {
+    // MIVO: side-effect: advances the file channel position to end of header
+    private long findNextOffset(@NotNull final FileChannel fileChannel) throws IOException {
         final StreamSearcher searcher = new StreamSearcher(HEADER);
         final long currentPosition = fileChannel.position();
         final InputStream fileInputStream = Channels.newInputStream(fileChannel);
@@ -75,20 +76,6 @@ class BamFile {
         return ImmutableArchive.of(header, payload);
     }
 
-    private static long readLittleEndianField(@NotNull final InputStream archive, final int bytes) throws IOException {
-        if (bytes == 1) {
-            return archive.read() & 0x00000000ffffffffL;
-        } else {
-            final ByteBuffer buffer = ByteBuffer.allocate(bytes).order(ByteOrder.LITTLE_ENDIAN);
-            archive.read(buffer.array());
-            if (bytes == 2) {
-                return buffer.getShort() & 0x00000000ffffffffL;
-            } else {
-                return buffer.getInt() & 0x00000000ffffffffL;
-            }
-        }
-    }
-
     Observable<Archive> findArchives() {
         return Observable.create((final ObservableEmitter<Archive> observer) -> {
             try {
@@ -123,6 +110,7 @@ class BamFile {
                         }
                         fileChannel.position(nextHeaderOffset + HEADER.length);
                     } else {
+                        fileChannel.position(previousHeaderOffset + 1);
                         nextHeaderOffset = findNextOffset(fileChannel);
                         final ArchiveHeader header =
                                 ImmutableArchiveHeader.of(previousHeaderOffset, nextHeaderOffset, currentBlockSize, -1, -1);
