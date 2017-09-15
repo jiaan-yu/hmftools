@@ -3,12 +3,12 @@ package com.hartwig.hmftools.bamrecovery;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.RandomAccessFile;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
 
 import com.twitter.elephantbird.util.StreamSearcher;
 
@@ -16,8 +16,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
-import io.reactivex.Observable;
-import io.reactivex.ObservableEmitter;
+import io.reactivex.Flowable;
 
 class BamFile {
 
@@ -38,7 +37,7 @@ class BamFile {
     }
 
     // MIVO: side-effect: advances the file channel position to end of header
-    private long findNextOffset(@NotNull final FileChannel fileChannel) throws IOException {
+    static long findNextOffset(@NotNull final FileChannel fileChannel) throws IOException {
         final StreamSearcher searcher = new StreamSearcher(HEADER);
         final long currentPosition = fileChannel.position();
         final InputStream fileInputStream = Channels.newInputStream(fileChannel);
@@ -76,68 +75,46 @@ class BamFile {
         return ImmutableArchive.of(header, payload);
     }
 
-    Observable<Archive> findArchives() {
-        return Observable.create((final ObservableEmitter<Archive> observer) -> {
-            try {
-                final RandomAccessFile randomFile = new RandomAccessFile(file, "r");
-                final FileChannel fileChannel = randomFile.getChannel();
-                long previousHeaderOffset = findNextOffset(fileChannel);
-                while ((previousHeaderOffset != -1 || previousHeaderOffset != file.length()) && !observer.isDisposed()) {
-                    //                    LOGGER.info("reading archive at " + previousHeaderOffset);
-                    final int currentBlockSize = extractBlockSize(fileChannel) + 1;
-                    long nextHeaderOffset = previousHeaderOffset + currentBlockSize;
-
-                    if (nextHeaderOffset == file.length()) {
-                        LOGGER.info("Reached end of file.");
-                        if (currentBlockSize != 28) {
-                            LOGGER.warn("EOF maker block should have a size of 28, but was: " + currentBlockSize);
-                        }
-                        break;
-                    }
-                    fileChannel.position(nextHeaderOffset);
-                    if (equalsHeader(extractHeader(fileChannel))) {
-                        // header is in expected position
-                        fileChannel.position(nextHeaderOffset - BLOCK_FOOTER_LENGTH);
-                        final int expectedCrc = extractFooterField(fileChannel);
-                        final int uncompressedSize = extractFooterField(fileChannel);
-                        final ArchiveHeader header =
-                                ImmutableArchiveHeader.of(previousHeaderOffset, nextHeaderOffset, currentBlockSize, expectedCrc,
-                                        uncompressedSize);
-
-                        final Archive archive = extractArchive(fileChannel, header);
-                        if (!observer.isDisposed()) {
-                            observer.onNext(archive);
-                        }
-                        fileChannel.position(nextHeaderOffset + HEADER.length);
-                    } else {
-                        fileChannel.position(previousHeaderOffset + 1);
-                        nextHeaderOffset = findNextOffset(fileChannel);
-                        final ArchiveHeader header =
-                                ImmutableArchiveHeader.of(previousHeaderOffset, nextHeaderOffset, currentBlockSize, -1, -1);
-                        LOGGER.info("Truncated archive: " + previousHeaderOffset + " -> " + nextHeaderOffset + ". Expected size: "
-                                + currentBlockSize + ", actual size: " + (nextHeaderOffset - previousHeaderOffset));
-                        if (!observer.isDisposed()) {
-                            observer.onNext(ImmutableArchive.of(header, new byte[0]));
-                        }
-                    }
-                    previousHeaderOffset = nextHeaderOffset;
+    Flowable<Archive> findArchives() {
+        return Flowable.generate(() -> FlowableState.initialState(file), (state, emitter) -> {
+            if (state.currentHeaderOffset() == -1) {
+                LOGGER.warn("Could not find next header in " + file.getName());
+                emitter.onComplete();
+                return state;
+            } else if (state.currentHeaderOffset() == file.length()) {
+                LOGGER.warn("File " + file.getName() + " does not end with the EOF marker block.");
+                emitter.onComplete();
+                return state;
+            } else {
+                final int currentBlockSize = extractBlockSize(state.fileChannel()) + 1;
+                long nextHeaderOffset = state.currentHeaderOffset() + currentBlockSize;
+                if (nextHeaderOffset == file.length() && currentBlockSize == 28) {
+                    emitter.onComplete();
+                    return state;
                 }
-                fileChannel.close();
-                if (!observer.isDisposed()) {
-                    observer.onComplete();
+                state.fileChannel().position(nextHeaderOffset);
+                if (nextHeaderOffset == file.length() || Arrays.equals(extractHeader(state.fileChannel()), HEADER)) {
+                    state.fileChannel().position(nextHeaderOffset - BLOCK_FOOTER_LENGTH);
+                    final int expectedCrc = extractFooterField(state.fileChannel());
+                    final int uncompressedSize = extractFooterField(state.fileChannel());
+                    final ArchiveHeader header =
+                            ImmutableArchiveHeader.of(state.currentHeaderOffset(), nextHeaderOffset, currentBlockSize, expectedCrc,
+                                    uncompressedSize);
+                    final Archive archive = extractArchive(state.fileChannel(), header);
+                    emitter.onNext(archive);
+                    state.fileChannel().position(nextHeaderOffset + HEADER.length);
+                } else {
+                    state.fileChannel().position(state.currentHeaderOffset() + 1);
+                    nextHeaderOffset = findNextOffset(state.fileChannel());
+                    if (nextHeaderOffset == -1) {
+                        nextHeaderOffset = file.length();
+                    }
+                    final ArchiveHeader header =
+                            ImmutableArchiveHeader.of(state.currentHeaderOffset(), nextHeaderOffset, currentBlockSize, -1, -1);
+                    emitter.onNext(ImmutableArchive.of(header, new byte[0]));
                 }
-            } catch (final Exception e) {
-                observer.onError(e);
+                return ImmutableFlowableState.of(state.fileChannel(), nextHeaderOffset);
             }
-        });
-    }
-
-    private boolean equalsHeader(final byte[] bytesArray) {
-        for (int i = 0; i < bytesArray.length; i++) {
-            if (bytesArray[i] != HEADER[i]) {
-                return false;
-            }
-        }
-        return true;
+        }, flowableState -> flowableState.fileChannel().close());
     }
 }

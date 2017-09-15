@@ -13,7 +13,6 @@ class Unzipper {
     private static int MAX_ARCHIVE_SIZE = 65536;
 
     static boolean canUnzip(@NotNull final Archive archive) throws InterruptedException {
-        //        LOGGER.info("unzipping " + archive + " on " + Thread.currentThread().getName());
         final byte[] uncompressedData = new byte[MAX_ARCHIVE_SIZE];
         final Inflater inflater = new Inflater(true);
         inflater.setInput(archive.payload(), 0, archive.header().payloadSize());
@@ -35,7 +34,6 @@ class Unzipper {
             LOGGER.warn("Archive: " + archive + " failed decompression with: " + e.getMessage());
             return false;
         }
-        //        LOGGER.info("done unzipping " + archive + " on " + Thread.currentThread().getName());
         return true;
     }
 }

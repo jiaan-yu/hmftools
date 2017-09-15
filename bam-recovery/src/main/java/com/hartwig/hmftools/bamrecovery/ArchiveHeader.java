@@ -23,7 +23,7 @@ abstract class ArchiveHeader {
 
     abstract int uncompressedSize();
 
-    long actualSize() {
+    private long actualSize() {
         return endOffset() - startOffset();
     }
 
