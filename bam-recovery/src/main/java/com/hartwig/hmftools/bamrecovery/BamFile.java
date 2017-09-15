@@ -36,6 +36,11 @@ class BamFile {
         this.file = new File(fileName);
     }
 
+    @NotNull
+    public File getFile() {
+        return file;
+    }
+
     // MIVO: side-effect: advances the file channel position to end of header
     static long findNextOffset(@NotNull final FileChannel fileChannel) throws IOException {
         final StreamSearcher searcher = new StreamSearcher(HEADER);

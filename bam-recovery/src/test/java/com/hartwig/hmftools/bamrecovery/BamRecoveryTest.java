@@ -3,6 +3,7 @@ package com.hartwig.hmftools.bamrecovery;
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.List;
 
 import com.google.common.io.Resources;
@@ -45,11 +46,48 @@ public class BamRecoveryTest {
     public void reads3Good1TruncatedArchivesWithEof() throws IOException {
         final List<Archive> validArchives = BamRecovery.getValidArchives(new BamFile(MULTIPLE_ARCHIVES_BAM)).toList().blockingGet();
         assertEquals(3, validArchives.size());
+
+        final List<Archive> invalidArchives = BamRecovery.getInvalidArchives(new BamFile(MULTIPLE_ARCHIVES_BAM)).toList().blockingGet();
+        assertEquals(1, invalidArchives.size());
     }
 
     @Test
     public void skipsBitFlippedBamWithoutEof() throws IOException {
         final List<Archive> validArchives = BamRecovery.getValidArchives(new BamFile(BIT_FLIP_BAM)).toList().blockingGet();
         assertEquals(0, validArchives.size());
+    }
+
+    @Test
+    public void writesOnlyGoodArchivesWithEof() throws IOException {
+        final String testFileName = "testOut.bam";
+        final BamFile bamFile = new BamFile(MULTIPLE_ARCHIVES_BAM);
+        final List<Archive> invalidArchives = BamRecovery.getInvalidArchives(bamFile).toList().blockingGet();
+        final FileWriter fileWriter = new FileWriter(bamFile, testFileName);
+        fileWriter.copyWithoutInvalidArchives(invalidArchives);
+
+        final BamFile outputBam = new BamFile(testFileName);
+        final List<Archive> newInvalidArchives = BamRecovery.getInvalidArchives(outputBam).toList().blockingGet();
+        assertEquals(0, newInvalidArchives.size());
+        final List<Archive> validArchives = BamRecovery.getValidArchives(outputBam).toList().blockingGet();
+        assertEquals(3, validArchives.size());
+        Files.delete(outputBam.getFile().toPath());
+    }
+
+    @Test
+    public void writesGoodArchivesWithEof() throws IOException {
+        final String testFileName = "testOut.bam";
+        final BamFile bamFile = new BamFile(GOOD_EOF_BAM);
+
+        final List<Archive> invalidArchives = BamRecovery.getInvalidArchives(bamFile).toList().blockingGet();
+        assertEquals(0, invalidArchives.size());
+        final FileWriter fileWriter = new FileWriter(bamFile, testFileName);
+        fileWriter.copyWithoutInvalidArchives(invalidArchives);
+
+        final BamFile outputBam = new BamFile(testFileName);
+        final List<Archive> newInvalidArchives = BamRecovery.getInvalidArchives(outputBam).toList().blockingGet();
+        assertEquals(0, newInvalidArchives.size());
+        final List<Archive> validArchives = BamRecovery.getValidArchives(outputBam).toList().blockingGet();
+        assertEquals(1, validArchives.size());
+        Files.delete(outputBam.getFile().toPath());
     }
 }
