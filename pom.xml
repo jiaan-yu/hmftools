@@ -26,6 +26,7 @@
         <module>patient-report-mailer</module>
         <module>ensembl-db</module>
         <module>bam-slicer</module>
+        <module>bachelor</module>
     </modules>
 
     <properties>

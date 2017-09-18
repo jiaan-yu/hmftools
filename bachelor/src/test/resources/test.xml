@@ -1,0 +1,36 @@
+<?xml version="1.0" ?>
+<Programs xmlns="http://www.hartwigmedicalfoundation.nl/bachelor.xsd">
+    <Program name="TestStudy">
+        <Inclusions>
+            <Inclusion>
+                <Gene>
+                    <GeneName>BRCA2</GeneName>
+                    <Refseq>NM_000059</Refseq>
+                </Gene>
+                <SnpEffect>NONSENSE</SnpEffect>
+                <SnpEffect>FRAMESHIFT_INDEL</SnpEffect>
+            </Inclusion>
+        </Inclusions>
+        <Blacklist>
+            <Exclusion>
+                <Gene>
+                    <GeneName>BRCA1</GeneName>
+                </Gene>
+                <MinCodon>3326</MinCodon>
+            </Exclusion>
+        </Blacklist>
+        <Whitelist>
+            <Inclusion>
+                <Variant>
+                    <Gene>
+                        <GeneName>BRCA2</GeneName>
+                    </Gene>
+                    <CodonChange>M1I</CodonChange>
+                </Variant>
+            </Inclusion>
+            <Inclusion>
+                <dbSNP>rs81002844</dbSNP>
+            </Inclusion>
+        </Whitelist>
+    </Program>
+</Programs>

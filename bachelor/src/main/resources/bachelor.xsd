@@ -1,0 +1,91 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://www.hartwigmedicalfoundation.nl/bachelor.xsd"
+           xmlns="http://www.hartwigmedicalfoundation.nl/bachelor.xsd"
+           elementFormDefault="qualified">
+
+    <xs:simpleType name="snpEffect" final="restriction">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="NONSENSE"/>
+            <xs:enumeration value="FRAMESHIFT_INDEL"/>
+            <xs:enumeration value="SPLICE_DONOR"/>
+            <xs:enumeration value="SPLICE_ACCEPTOR"/>
+            <xs:enumeration value="MISSENSE"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="geneIdentifier">
+        <xs:choice maxOccurs="3">
+            <xs:element name="GeneName" type="xs:string"/>
+            <xs:element name="EntrezId" type="xs:positiveInteger"/>
+            <xs:element name="Refseq" type="xs:string"/>
+        </xs:choice>
+    </xs:complexType>
+
+    <xs:complexType name="ProgramInclusions">
+        <xs:sequence>
+            <xs:element name="Inclusion" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Gene" type="geneIdentifier"/>
+                        <xs:element name="SnpEffect" type="snpEffect" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="ProgramBlacklist">
+        <xs:sequence>
+            <xs:element name="Exclusion" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Gene" type="geneIdentifier"/>
+                        <xs:choice>
+                            <xs:element name="Variant" type="xs:string"/>
+                            <xs:element name="MinCodon" type="xs:positiveInteger"/>
+                        </xs:choice>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="ProgramWhitelist">
+        <xs:sequence>
+            <xs:element name="Inclusion" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:choice>
+                        <xs:element name="Variant">
+                            <xs:complexType>
+                                <xs:sequence>
+                                    <xs:element name="Gene" type="geneIdentifier"/>
+                                    <xs:element name="CodonChange" type="xs:string"/>
+                                </xs:sequence>
+                            </xs:complexType>
+                        </xs:element>
+                        <xs:element name="dbSNP" type="xs:string"/>
+                    </xs:choice>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:element name="Programs">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="Program" maxOccurs="unbounded">
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element name="Inclusions" type="ProgramInclusions"/>
+                            <xs:element name="Blacklist" type="ProgramBlacklist"/>
+                            <xs:element name="Whitelist" type="ProgramWhitelist"/>
+                        </xs:sequence>
+                        <xs:attribute name="name" type="xs:string"/>
+                    </xs:complexType>
+                </xs:element>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+</xs:schema>
