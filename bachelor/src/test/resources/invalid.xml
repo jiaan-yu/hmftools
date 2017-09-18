@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
-<Programs xmlns="http://www.hartwigmedicalfoundation.nl/bachelor.xsd">
+<Programs>
     <Program name="TestStudy">
         <Inclusions>
             <Inclusion>
@@ -8,7 +8,6 @@
                     <Refseq>NM_000059</Refseq>
                 </Gene>
                 <SnpEffect>NONSENSE</SnpEffect>
-                <SnpEffect>FRAMESHIFT_INDEL</SnpEffect>
             </Inclusion>
         </Inclusions>
         <Blacklist>
@@ -20,17 +19,13 @@
             </Exclusion>
         </Blacklist>
         <Whitelist>
-            <Inclusion>
-                <Variant>
-                    <Gene>
-                        <GeneName>BRCA2</GeneName>
-                    </Gene>
-                    <CodonChange>M1I</CodonChange>
-                </Variant>
-            </Inclusion>
-            <Inclusion>
-                <dbSNP>rs81002844</dbSNP>
-            </Inclusion>
+            <Variant>
+                <Gene>
+                    <GeneName>BRCA2</GeneName>
+                </Gene>
+                <CodonChange>M1I</CodonChange>
+            </Variant>
+            <dbSNP>rs81002844</dbSNP>
         </Whitelist>
     </Program>
 </Programs>

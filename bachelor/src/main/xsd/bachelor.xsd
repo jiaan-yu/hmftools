@@ -27,7 +27,7 @@
             <xs:element name="Inclusion" maxOccurs="unbounded">
                 <xs:complexType>
                     <xs:sequence>
-                        <xs:element name="Gene" type="geneIdentifier"/>
+                        <xs:element name="Gene" type="geneIdentifier" maxOccurs="unbounded"/>
                         <xs:element name="SnpEffect" type="snpEffect" maxOccurs="unbounded"/>
                     </xs:sequence>
                 </xs:complexType>
@@ -53,21 +53,17 @@
 
     <xs:complexType name="ProgramWhitelist">
         <xs:sequence>
-            <xs:element name="Inclusion" maxOccurs="unbounded">
-                <xs:complexType>
-                    <xs:choice>
-                        <xs:element name="Variant">
-                            <xs:complexType>
-                                <xs:sequence>
-                                    <xs:element name="Gene" type="geneIdentifier"/>
-                                    <xs:element name="CodonChange" type="xs:string"/>
-                                </xs:sequence>
-                            </xs:complexType>
-                        </xs:element>
-                        <xs:element name="dbSNP" type="xs:string"/>
-                    </xs:choice>
-                </xs:complexType>
-            </xs:element>
+            <xs:choice maxOccurs="unbounded">
+                <xs:element name="Variant">
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element name="Gene" type="geneIdentifier"/>
+                            <xs:element name="CodonChange" type="xs:string"/>
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
+                <xs:element name="dbSNP" type="xs:string"/>
+            </xs:choice>
         </xs:sequence>
     </xs:complexType>
 
