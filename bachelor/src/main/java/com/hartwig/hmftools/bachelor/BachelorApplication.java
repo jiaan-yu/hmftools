@@ -1,9 +1,12 @@
 package com.hartwig.hmftools.bachelor;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -25,15 +28,19 @@ import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.xml.sax.SAXException;
 
+import htsjdk.variant.vcf.VCFFileReader;
+
 public class BachelorApplication {
 
     private static final Logger LOGGER = LogManager.getLogger(BachelorApplication.class);
     private static final String CONFIG_DIRECTORY = "configDirectory";
+    private static final String VCF = "vcf";
 
     @NotNull
     private static Options createOptions() {
         final Options options = new Options();
         options.addOption(Option.builder(CONFIG_DIRECTORY).required().hasArg().desc("folder to find program XMLs").build());
+        options.addOption(Option.builder(VCF).numberOfArgs(Option.UNLIMITED_VALUES).desc("vcf to process").build());
         return options;
     }
 
@@ -66,7 +73,6 @@ public class BachelorApplication {
                     System.exit(1);
                 } else {
                     result.put(p.getName(), p);
-
                 }
             }
         }
@@ -77,9 +83,18 @@ public class BachelorApplication {
     public static void main(final String... args) throws ParseException, IOException, SAXException {
         final Options options = createOptions();
         final CommandLine cmd = createCommandLine(options, args);
-        final Path configPath = Paths.get(cmd.getOptionValue(CONFIG_DIRECTORY));
 
+        final Path configPath = Paths.get(cmd.getOptionValue(CONFIG_DIRECTORY));
         final Map<String, Programs.Program> map = loadXML(configPath);
-        LOGGER.debug(map);
+        final BachelorEligibility eligibility = BachelorEligibility.fromMap(map);
+
+        final List<File> vcfFiles = Arrays.stream(cmd.getOptionValues(VCF)).map(s -> Paths.get(s).toFile()).collect(Collectors.toList());
+        for (final File vcf : vcfFiles) {
+            LOGGER.info("process vcf: {}", vcf.getPath());
+            final VCFFileReader reader = new VCFFileReader(vcf, false);
+            final Map<String, Integer> result = eligibility.processVCF(reader);
+            LOGGER.info(result.entrySet().stream().sorted(Comparator.comparingInt(Map.Entry::getValue)).collect(Collectors.toList()));
+            reader.close();
+        }
     }
 }

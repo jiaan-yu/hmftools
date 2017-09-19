@@ -2,11 +2,9 @@
 <Programs xmlns="http://www.hartwigmedicalfoundation.nl/bachelor.xsd">
     <Program name="TestStudy">
         <Panel>
-            <Criteria>
-                <Gene name="BRCA2" refseq="NM_000059"/>
-                <SnpEffect>NONSENSE</SnpEffect>
-                <SnpEffect>FRAMESHIFT_INDEL</SnpEffect>
-            </Criteria>
+            <Gene name="BRCA2" refseq="NM_000059"/>
+            <SnpEffect>NONSENSE</SnpEffect>
+            <SnpEffect>FRAMESHIFT_INDEL</SnpEffect>
         </Panel>
         <Blacklist>
             <Exclusion>
@@ -17,7 +15,7 @@
         <Whitelist>
             <Variant>
                 <Gene name="BRCA2"/>
-                <CodonChange>M1I</CodonChange>
+                <HGVS.p>M1I</HGVS.p>
             </Variant>
             <dbSNP>rs81002844</dbSNP>
             <dbSNP>rs12345678</dbSNP>

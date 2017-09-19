@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-           targetNamespace="http://www.hartwigmedicalfoundation.nl/bachelor.xsd"
-           xmlns="http://www.hartwigmedicalfoundation.nl/bachelor.xsd"
-           elementFormDefault="qualified">
+            targetNamespace="http://www.hartwigmedicalfoundation.nl/bachelor.xsd"
+            xmlns="http://www.hartwigmedicalfoundation.nl/bachelor.xsd"
+            elementFormDefault="qualified">
 
     <xsd:simpleType name="snpEffect" final="restriction">
         <xsd:restriction base="xsd:string">
@@ -22,17 +22,11 @@
 
     <xsd:complexType name="ProgramPanel">
         <xsd:sequence>
-            <xsd:element name="Criteria" minOccurs="0" maxOccurs="unbounded">
-                <xsd:complexType>
-                    <xsd:sequence>
-                        <xsd:choice>
-                            <xsd:element name="Gene" type="geneIdentifier" maxOccurs="unbounded"/>
-                            <xsd:element name="AllGenes"/>
-                        </xsd:choice>
-                        <xsd:element name="SnpEffect" type="snpEffect" maxOccurs="unbounded"/>
-                    </xsd:sequence>
-                </xsd:complexType>
-            </xsd:element>
+            <xsd:choice>
+                <xsd:element name="Gene" type="geneIdentifier" maxOccurs="unbounded"/>
+                <xsd:element name="AllGenes"/>
+            </xsd:choice>
+            <xsd:element name="SnpEffect" type="snpEffect" maxOccurs="unbounded"/>
         </xsd:sequence>
     </xsd:complexType>
 
@@ -59,7 +53,7 @@
                     <xsd:complexType>
                         <xsd:sequence>
                             <xsd:element name="Gene" type="geneIdentifier"/>
-                            <xsd:element name="CodonChange" type="xsd:string"/>
+                            <xsd:element name="HGVS.p" type="xsd:string"/>
                         </xsd:sequence>
                     </xsd:complexType>
                 </xsd:element>
