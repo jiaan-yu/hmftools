@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://www.hartwigmedicalfoundation.nl/bachelor.xsd"
+           xmlns="http://www.hartwigmedicalfoundation.nl/bachelor.xsd"
+           elementFormDefault="qualified">
+
+    <xsd:simpleType name="snpEffect" final="restriction">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="NONSENSE"/>
+            <xsd:enumeration value="FRAMESHIFT_INDEL"/>
+            <xsd:enumeration value="SPLICE_DONOR"/>
+            <xsd:enumeration value="SPLICE_ACCEPTOR"/>
+            <xsd:enumeration value="MISSENSE"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+
+    <xsd:complexType name="geneIdentifier">
+        <xsd:attribute name="name" type="xsd:string" use="required"/>
+        <xsd:attribute name="entrezId" type="xsd:positiveInteger"/>
+        <xsd:attribute name="refseq" type="xsd:string"/>
+    </xsd:complexType>
+
+    <xsd:complexType name="ProgramPanel">
+        <xsd:sequence>
+            <xsd:element name="Criteria" minOccurs="0" maxOccurs="unbounded">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:choice>
+                            <xsd:element name="Gene" type="geneIdentifier" maxOccurs="unbounded"/>
+                            <xsd:element name="AllGenes"/>
+                        </xsd:choice>
+                        <xsd:element name="SnpEffect" type="snpEffect" maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="ProgramBlacklist">
+        <xsd:sequence>
+            <xsd:element name="Exclusion" minOccurs="0" maxOccurs="unbounded">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="Gene" type="geneIdentifier"/>
+                        <xsd:choice>
+                            <xsd:element name="Variant" type="xsd:string"/>
+                            <xsd:element name="MinCodon" type="xsd:positiveInteger"/>
+                        </xsd:choice>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="ProgramWhitelist">
+        <xsd:sequence>
+            <xsd:choice maxOccurs="unbounded">
+                <xsd:element name="Variant">
+                    <xsd:complexType>
+                        <xsd:sequence>
+                            <xsd:element name="Gene" type="geneIdentifier"/>
+                            <xsd:element name="CodonChange" type="xsd:string"/>
+                        </xsd:sequence>
+                    </xsd:complexType>
+                </xsd:element>
+                <xsd:element name="dbSNP">
+                    <xsd:simpleType>
+                        <xsd:restriction base="xsd:string">
+                            <xsd:pattern value="rs[0-9]+"/>
+                        </xsd:restriction>
+                    </xsd:simpleType>
+                </xsd:element>
+            </xsd:choice>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:element name="Programs">
+        <xsd:complexType>
+            <xsd:sequence>
+                <xsd:element name="Program" maxOccurs="unbounded">
+                    <xsd:complexType>
+                        <xsd:sequence>
+                            <xsd:element name="Panel" type="ProgramPanel"/>
+                            <xsd:element name="Blacklist" type="ProgramBlacklist" minOccurs="0"/>
+                            <xsd:element name="Whitelist" type="ProgramWhitelist" minOccurs="0"/>
+                        </xsd:sequence>
+                        <xsd:attribute name="name" type="xsd:string"/>
+                    </xsd:complexType>
+                </xsd:element>
+            </xsd:sequence>
+        </xsd:complexType>
+    </xsd:element>
+
+</xsd:schema>

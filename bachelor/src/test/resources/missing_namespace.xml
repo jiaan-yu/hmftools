@@ -1,31 +1,26 @@
 <?xml version="1.0" ?>
 <Programs>
     <Program name="TestStudy">
-        <Inclusions>
-            <Inclusion>
-                <Gene>
-                    <GeneName>BRCA2</GeneName>
-                    <Refseq>NM_000059</Refseq>
-                </Gene>
+        <Panel>
+            <Criteria>
+                <Gene name="BRCA2" refseq="NM_000059"/>
                 <SnpEffect>NONSENSE</SnpEffect>
-            </Inclusion>
-        </Inclusions>
+                <SnpEffect>FRAMESHIFT_INDEL</SnpEffect>
+            </Criteria>
+        </Panel>
         <Blacklist>
             <Exclusion>
-                <Gene>
-                    <GeneName>BRCA1</GeneName>
-                </Gene>
+                <Gene name="BRCA1"/>
                 <MinCodon>3326</MinCodon>
             </Exclusion>
         </Blacklist>
         <Whitelist>
             <Variant>
-                <Gene>
-                    <GeneName>BRCA2</GeneName>
-                </Gene>
+                <Gene name="BRCA2"/>
                 <CodonChange>M1I</CodonChange>
             </Variant>
             <dbSNP>rs81002844</dbSNP>
+            <dbSNP>rs12345678</dbSNP>
         </Whitelist>
     </Program>
 </Programs>

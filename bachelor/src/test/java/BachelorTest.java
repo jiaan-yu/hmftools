@@ -1,44 +1,45 @@
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNotNull;
 
-import java.io.File;
+import static junit.framework.TestCase.assertNull;
+
 import java.io.IOException;
+import java.nio.file.Paths;
 
-import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
 
 import com.google.common.io.Resources;
-import com.hartwig.hmftools.bachelor.Programs;
+import com.hartwig.hmftools.bachelor.BachelorSchema;
 
+import nl.hartwigmedicalfoundation.bachelor.Programs;
+
+import org.jetbrains.annotations.Nullable;
 import org.junit.Test;
 import org.xml.sax.SAXException;
 
 public class BachelorTest {
 
     private final static String TEST_XML = Resources.getResource("valid.xml").getPath();
-    private final static String TEST_INVALID_XML = Resources.getResource("invalid.xml").getPath();
+    private final static String TEST_INVALID_XML = Resources.getResource("missing_namespace.xml").getPath();
+    private final static String TEST_DBSNP_XML = Resources.getResource("missing_namespace.xml").getPath();
 
-    @Test
-    public void TestValid() throws JAXBException, IOException, SAXException {
-
-        final JAXBContext context = JAXBContext.newInstance(com.hartwig.hmftools.bachelor.Programs.class);
-        final Unmarshaller unmarshaller = context.createUnmarshaller();
-        final Programs programs = (Programs) unmarshaller.unmarshal(new File(TEST_XML));
-
-        assertTrue(programs != null);
+    @Nullable
+    private static Programs testFile(final String path) throws JAXBException, SAXException {
+        final BachelorSchema schema = BachelorSchema.make();
+        return schema.processXML(Paths.get(path));
     }
 
     @Test
-    public void TestInvalid() throws JAXBException, IOException, SAXException {
-        final JAXBContext context = JAXBContext.newInstance(com.hartwig.hmftools.bachelor.Programs.class);
-        final Unmarshaller unmarshaller = context.createUnmarshaller();
+    public void TestValid() throws JAXBException, IOException, SAXException {
+        assertNotNull(testFile(TEST_XML));
+    }
 
-        Programs programs = null;
-        try {
-            programs = (Programs) unmarshaller.unmarshal(new File(TEST_INVALID_XML));
-        } catch (final JAXBException e) {
-        }
+    @Test
+    public void TestMissingNamespace() throws JAXBException, IOException, SAXException {
+        assertNull(testFile(TEST_INVALID_XML));
+    }
 
-        assertTrue(programs == null);
+    @Test
+    public void TestInvalidDBSNP() throws JAXBException, IOException, SAXException {
+        assertNull(testFile(TEST_DBSNP_XML));
     }
 }

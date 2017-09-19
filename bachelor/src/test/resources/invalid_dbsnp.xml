@@ -19,8 +19,7 @@
                 <Gene name="BRCA2"/>
                 <CodonChange>M1I</CodonChange>
             </Variant>
-            <dbSNP>rs81002844</dbSNP>
-            <dbSNP>rs12345678</dbSNP>
+            <dbSNP>ab81002844</dbSNP>
         </Whitelist>
     </Program>
 </Programs>
