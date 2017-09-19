@@ -2,7 +2,7 @@
 <Programs xmlns="http://www.hartwigmedicalfoundation.nl/bachelor.xsd">
     <Program name="TestStudy">
         <Panel>
-            <Gene name="BRCA2" refseq="NM_000059"/>
+            <Gene name="BRCA2" ensembl="ENST00000544455" refseq="NM_000059"/>
             <SnpEffect>NONSENSE</SnpEffect>
             <SnpEffect>FRAMESHIFT_INDEL</SnpEffect>
         </Panel>
