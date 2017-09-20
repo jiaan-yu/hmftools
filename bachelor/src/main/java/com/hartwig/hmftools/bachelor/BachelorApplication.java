@@ -78,21 +78,29 @@ public class BachelorApplication {
         return result;
     }
 
-    public static void main(final String... args) throws ParseException, IOException, SAXException {
+    public static void main(final String... args) {
         final Options options = createOptions();
-        final CommandLine cmd = createCommandLine(options, args);
+        try {
+            final CommandLine cmd = createCommandLine(options, args);
 
-        final Path configPath = Paths.get(cmd.getOptionValue(CONFIG_DIRECTORY));
-        final Map<String, Program> map = loadXML(configPath);
-        final BachelorEligibility eligibility = BachelorEligibility.fromMap(map);
+            final Path configPath = Paths.get(cmd.getOptionValue(CONFIG_DIRECTORY));
+            final Map<String, Program> map = loadXML(configPath);
+            final BachelorEligibility eligibility = BachelorEligibility.fromMap(map);
 
-        final List<File> vcfFiles = Arrays.stream(cmd.getOptionValues(VCF)).map(s -> Paths.get(s).toFile()).collect(Collectors.toList());
-        for (final File vcf : vcfFiles) {
-            LOGGER.info("process vcf: {}", vcf.getPath());
-            final VCFFileReader reader = new VCFFileReader(vcf, false);
-            final Map<String, Integer> result = eligibility.processVCF(reader);
-            LOGGER.info(result.entrySet().stream().sorted(Comparator.comparingInt(Map.Entry::getValue)).collect(Collectors.toList()));
-            reader.close();
+            final List<File> vcfFiles =
+                    Arrays.stream(cmd.getOptionValues(VCF)).map(s -> Paths.get(s).toFile()).collect(Collectors.toList());
+            for (final File vcf : vcfFiles) {
+                LOGGER.info("process vcf: {}", vcf.getPath());
+                final VCFFileReader reader = new VCFFileReader(vcf, false);
+                final Map<String, Integer> result = eligibility.processVCF(reader);
+                LOGGER.info(result.entrySet().stream().sorted(Comparator.comparingInt(Map.Entry::getValue)).collect(Collectors.toList()));
+                reader.close();
+            }
+        } catch (final ParseException e) {
+            printHelpAndExit(options);
+        } catch (final Exception e) {
+            LOGGER.error(e);
+            System.exit(2);
         }
     }
 }

@@ -2,6 +2,6 @@
 <Program name="TestStudy">
     <Panel>
         <AllGene/>
-        <SnpEffect>NONSENSE</SnpEffect>
+        <SnpEffect>stop_gained</SnpEffect>
     </Panel>
 </Program>
