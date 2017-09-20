@@ -1,24 +1,22 @@
 <?xml version="1.0" ?>
-<Programs xmlns="http://www.hartwigmedicalfoundation.nl/bachelor.xsd">
-    <Program name="TestStudy">
-        <Panel>
-            <Gene name="BRCA2" ensembl="ENST00000544455" refseq="NM_000059"/>
-            <SnpEffect>NONSENSE</SnpEffect>
-            <SnpEffect>FRAMESHIFT_INDEL</SnpEffect>
-        </Panel>
-        <Blacklist>
-            <Exclusion>
-                <Gene name="BRCA1"/>
-                <MinCodon>3326</MinCodon>
-            </Exclusion>
-        </Blacklist>
-        <Whitelist>
-            <Variant>
-                <Gene name="BRCA2"/>
-                <HGVS.p>M1I</HGVS.p>
-            </Variant>
-            <dbSNP>rs81002844</dbSNP>
-            <dbSNP>rs12345678</dbSNP>
-        </Whitelist>
-    </Program>
-</Programs>
+<Program name="TestStudy" xmlns="http://www.hartwigmedicalfoundation.nl/bachelor.xsd">
+    <Panel>
+        <Gene name="BRCA2" ensembl="ENST00000544455" refseq="NM_000059"/>
+        <SnpEffect>NONSENSE</SnpEffect>
+        <SnpEffect>FRAMESHIFT_INDEL</SnpEffect>
+    </Panel>
+    <Blacklist>
+        <Exclusion>
+            <Gene name="BRCA1"/>
+            <MinCodon>3326</MinCodon>
+        </Exclusion>
+    </Blacklist>
+    <Whitelist>
+        <Variant>
+            <Gene name="BRCA2"/>
+            <HGVS.p>M1I</HGVS.p>
+        </Variant>
+        <dbSNP>rs81002844</dbSNP>
+        <dbSNP>rs12345678</dbSNP>
+    </Whitelist>
+</Program>

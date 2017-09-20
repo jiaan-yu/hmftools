@@ -9,9 +9,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import nl.hartwigmedicalfoundation.bachelor.GeneIdentifier;
+import nl.hartwigmedicalfoundation.bachelor.Program;
 import nl.hartwigmedicalfoundation.bachelor.ProgramBlacklist;
 import nl.hartwigmedicalfoundation.bachelor.ProgramWhitelist;
-import nl.hartwigmedicalfoundation.bachelor.Programs;
 import nl.hartwigmedicalfoundation.bachelor.SnpEffect;
 
 import htsjdk.variant.variantcontext.VariantContext;
@@ -40,15 +40,19 @@ public class BachelorEligibility {
     private BachelorEligibility() {
     }
 
-    public static BachelorEligibility fromMap(final Map<String, Programs.Program> input) {
+    public static BachelorEligibility fromMap(final Map<String, Program> input) {
         final BachelorEligibility result = new BachelorEligibility();
 
-        for (final Map.Entry<String, Programs.Program> e : input.entrySet()) {
-            final Programs.Program p = e.getValue();
+        for (final Map.Entry<String, Program> e : input.entrySet()) {
+            final Program p = e.getValue();
 
             final boolean allGene = p.getPanel().getAllGenes() != null;
             final List<GeneIdentifier> panel = p.getPanel().getGene();
             final List<SnpEffect> effects = p.getPanel().getSnpEffect();
+
+            // load ensembl mappings
+            final Map<String, String> geneToEnsemblMap =
+                    p.getPanel().getGene().stream().collect(Collectors.toMap(GeneIdentifier::getName, GeneIdentifier::getEnsembl));
 
             final List<ProgramBlacklist.Exclusion> blacklist =
                     p.getBlacklist() != null ? p.getBlacklist().getExclusion() : Lists.newArrayList();
@@ -91,7 +95,7 @@ public class BachelorEligibility {
         for (final VariantContext variant : reader) {
             final List<String> matchingPrograms = predicates.entrySet()
                     .stream()
-                    .filter(e -> e.getValue().test(ExtractedVariantInfo.from(variant)))
+                    .filter(program -> program.getValue().test(ExtractedVariantInfo.from(variant)))
                     .map(Map.Entry::getKey)
                     .collect(Collectors.toList());
             matchingPrograms.forEach(s -> counts.compute(s, (k, v) -> v == null ? 1 : v + 1));

@@ -77,20 +77,14 @@
         </xsd:sequence>
     </xsd:complexType>
 
-    <xsd:element name="Programs">
+    <xsd:element name="Program">
         <xsd:complexType>
             <xsd:sequence>
-                <xsd:element name="Program" maxOccurs="unbounded">
-                    <xsd:complexType>
-                        <xsd:sequence>
-                            <xsd:element name="Panel" type="ProgramPanel"/>
-                            <xsd:element name="Blacklist" type="ProgramBlacklist" minOccurs="0"/>
-                            <xsd:element name="Whitelist" type="ProgramWhitelist" minOccurs="0"/>
-                        </xsd:sequence>
-                        <xsd:attribute name="name" type="xsd:string"/>
-                    </xsd:complexType>
-                </xsd:element>
+                <xsd:element name="Panel" type="ProgramPanel"/>
+                <xsd:element name="Blacklist" type="ProgramBlacklist" minOccurs="0"/>
+                <xsd:element name="Whitelist" type="ProgramWhitelist" minOccurs="0"/>
             </xsd:sequence>
+            <xsd:attribute name="name" type="xsd:string" use="required"/>
         </xsd:complexType>
     </xsd:element>
 

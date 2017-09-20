@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.Maps;
 
-import nl.hartwigmedicalfoundation.bachelor.Programs;
+import nl.hartwigmedicalfoundation.bachelor.Program;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -56,24 +56,22 @@ public class BachelorApplication {
         System.exit(1);
     }
 
-    private static Map<String, Programs.Program> loadXML(final Path path) throws IOException, SAXException {
+    private static Map<String, Program> loadXML(final Path path) throws IOException, SAXException {
         final BachelorSchema schema = BachelorSchema.make();
 
-        final List<Programs> programs = Files.walk(path)
+        final List<Program> programs = Files.walk(path)
                 .filter(p -> p.toString().endsWith(".xml"))
                 .map(schema::processXML)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
-        final Map<String, Programs.Program> result = Maps.newHashMap();
-        for (final Programs ps : programs) {
-            for (final Programs.Program p : ps.getProgram()) {
-                if (result.containsKey(p.getName())) {
-                    LOGGER.error("duplicate programs detected: {}", p.getName());
-                    System.exit(1);
-                } else {
-                    result.put(p.getName(), p);
-                }
+        final Map<String, Program> result = Maps.newHashMap();
+        for (final Program p : programs) {
+            if (result.containsKey(p.getName())) {
+                LOGGER.error("duplicate programs detected: {}", p.getName());
+                System.exit(1);
+            } else {
+                result.put(p.getName(), p);
             }
         }
 
@@ -85,7 +83,7 @@ public class BachelorApplication {
         final CommandLine cmd = createCommandLine(options, args);
 
         final Path configPath = Paths.get(cmd.getOptionValue(CONFIG_DIRECTORY));
-        final Map<String, Programs.Program> map = loadXML(configPath);
+        final Map<String, Program> map = loadXML(configPath);
         final BachelorEligibility eligibility = BachelorEligibility.fromMap(map);
 
         final List<File> vcfFiles = Arrays.stream(cmd.getOptionValues(VCF)).map(s -> Paths.get(s).toFile()).collect(Collectors.toList());

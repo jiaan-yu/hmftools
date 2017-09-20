@@ -10,7 +10,7 @@ import javax.xml.bind.JAXBException;
 import com.google.common.io.Resources;
 import com.hartwig.hmftools.bachelor.BachelorSchema;
 
-import nl.hartwigmedicalfoundation.bachelor.Programs;
+import nl.hartwigmedicalfoundation.bachelor.Program;
 
 import org.jetbrains.annotations.Nullable;
 import org.junit.Test;
@@ -23,7 +23,7 @@ public class BachelorTest {
     private final static String TEST_DBSNP_XML = Resources.getResource("missing_namespace.xml").getPath();
 
     @Nullable
-    private static Programs testFile(final String path) throws JAXBException, SAXException {
+    private static Program testFile(final String path) throws JAXBException, SAXException {
         final BachelorSchema schema = BachelorSchema.make();
         return schema.processXML(Paths.get(path));
     }

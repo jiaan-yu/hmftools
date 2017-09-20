@@ -11,7 +11,7 @@ import javax.xml.validation.SchemaFactory;
 
 import com.google.common.io.Resources;
 
-import nl.hartwigmedicalfoundation.bachelor.Programs;
+import nl.hartwigmedicalfoundation.bachelor.Program;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -32,15 +32,15 @@ public class BachelorSchema {
     }
 
     @Nullable
-    public Programs processXML(final Path path) {
+    public Program processXML(final Path path) {
         LOGGER.info("loading file: {}", path);
         try {
-            final JAXBContext context = JAXBContext.newInstance(Programs.class);
+            final JAXBContext context = JAXBContext.newInstance(Program.class);
             final Unmarshaller unmarshaller = context.createUnmarshaller();
             unmarshaller.setSchema(schema);
-            return (Programs) unmarshaller.unmarshal(path.toFile());
+            return (Program) unmarshaller.unmarshal(path.toFile());
         } catch (final JAXBException e) {
-            LOGGER.error("Failed to process: {}", path);
+            LOGGER.error("failed to process: {}", path);
             LOGGER.error(e);
             return null;
         }

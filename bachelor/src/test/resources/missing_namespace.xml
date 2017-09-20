@@ -1,9 +1,7 @@
 <?xml version="1.0" ?>
-<Programs>
-    <Program name="TestStudy">
-        <Panel>
-            <AllGene/>
-            <SnpEffect>NONSENSE</SnpEffect>
-        </Panel>
-    </Program>
-</Programs>
+<Program name="TestStudy">
+    <Panel>
+        <AllGene/>
+        <SnpEffect>NONSENSE</SnpEffect>
+    </Panel>
+</Program>
