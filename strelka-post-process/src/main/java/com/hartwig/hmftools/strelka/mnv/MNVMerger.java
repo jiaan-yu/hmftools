@@ -53,16 +53,21 @@ public abstract class MNVMerger {
     @VisibleForTesting
     VariantContext mergeVariants(@NotNull final List<VariantContext> variants, @NotNull final Map<Integer, Character> gapReads) {
         final List<Allele> alleles = createMnvAlleles(variants, gapReads);
-        final VariantContext firstVariant = variants.get(0);
-        final VariantContext lastVariant = variants.get(variants.size() - 1);
         final Map<String, Object> attributes = createMnvAttributes(variants);
-        final String sampleName = firstVariant.getSampleNamesOrderedByName().get(0);
+        return buildMnv(variants, alleles, attributes);
+    }
+
+    @NotNull
+    static VariantContext buildMnv(@NotNull final List<VariantContext> variants, @NotNull final List<Allele> alleles,
+            @NotNull final Map<String, Object> attributes) {
+        final VariantContext first = variants.get(0);
+        final VariantContext last = variants.get(variants.size() - 1);
+        final String sampleName = first.getSampleNamesOrderedByName().get(0);
         final Genotype genotype = new GenotypeBuilder(sampleName, alleles).DP(mergeDP(variants)).AD(mergeAD(variants)).make();
-        return new VariantContextBuilder(firstVariant.getSource(),
-                firstVariant.getContig(),
-                firstVariant.getStart(),
-                lastVariant.getEnd(),
-                alleles).genotypes(genotype).filters(firstVariant.getFilters()).attributes(attributes).make();
+        return new VariantContextBuilder(first.getSource(), first.getContig(), first.getStart(), last.getEnd(), alleles).genotypes(genotype)
+                .filters(first.getFilters())
+                .attributes(attributes)
+                .make();
     }
 
     @NotNull
@@ -112,7 +117,7 @@ public abstract class MNVMerger {
     }
 
     @NotNull
-    private Map<String, Object> createMnvAttributes(@NotNull final List<VariantContext> variants) {
+    Map<String, Object> createMnvAttributes(@NotNull final List<VariantContext> variants) {
         final Map<String, Object> attributes;
         if (variants.stream().anyMatch(VariantContext::isIndel)) {
             attributes = mergeAttributes(variants.stream().filter(VariantContext::isIndel).collect(Collectors.toList()));
