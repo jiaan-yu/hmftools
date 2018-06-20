@@ -143,8 +143,6 @@ public class VcfMNVValidatorTest {
         for (int index = 1; index < variants.length; index++) {
             potentialMNV = PotentialMNV.addVariant(potentialMNV, variants[index]);
         }
-        System.out.println(potentialMNV.start());
-        System.out.println(potentialMNV.end() - 1);
         return mnv.getContig().equals(potentialMNV.chromosome()) && mnv.getStart() == potentialMNV.start()
                 && mnv.getEnd() == potentialMNV.end() - 1 && VcfMNVValidator.potentialMnvMatchesCorrectedMnv(potentialMNV, mnv);
     }

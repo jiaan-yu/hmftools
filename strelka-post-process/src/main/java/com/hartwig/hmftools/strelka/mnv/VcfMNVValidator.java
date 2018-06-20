@@ -129,8 +129,12 @@ public abstract class VcfMNVValidator implements MNVValidator {
         final String variantAlt = variant.getAlternateAllele(0).getBaseString();
         final String mnvRef = mnv.getReference().getBaseString();
         final String mnvAlt = mnv.getAlternateAllele(0).getBaseString();
-        return mnvRef.substring(refStart, refStart + variantRef.length()).equals(variantRef) && mnvAlt.substring(altStart,
-                altStart + variantAlt.length()).equals(variantAlt);
+        try {
+            return mnvRef.substring(refStart, refStart + variantRef.length()).equals(variantRef) && mnvAlt.substring(altStart,
+                    altStart + variantAlt.length()).equals(variantAlt);
+        } catch (final IndexOutOfBoundsException e) {
+            return false;
+        }
     }
 
     @NotNull
