@@ -5,11 +5,11 @@ import static com.hartwig.hmftools.strelka.StrelkaPostProcessApplication.generat
 import java.io.File;
 import java.util.Optional;
 
+import com.hartwig.hmftools.strelka.mnv.BamMNVValidator;
+import com.hartwig.hmftools.strelka.mnv.ImmutableBamMNVValidator;
 import com.hartwig.hmftools.strelka.mnv.ImmutableMNVMerger;
-import com.hartwig.hmftools.strelka.mnv.ImmutableMNVValidator;
 import com.hartwig.hmftools.strelka.mnv.MNVDetector;
 import com.hartwig.hmftools.strelka.mnv.MNVMerger;
-import com.hartwig.hmftools.strelka.mnv.MNVValidator;
 import com.hartwig.hmftools.strelka.mnv.PotentialMNVRegion;
 
 import org.apache.commons.cli.CommandLine;
@@ -76,7 +76,7 @@ public class MNVValidatorApplication {
                 .setReferenceDictionary(vcfReader.getFileHeader().getSequenceDictionary())
                 .build();
         vcfWriter.writeHeader(vcfReader.getFileHeader());
-        final MNVValidator validator = ImmutableMNVValidator.of(tumorBam);
+        final BamMNVValidator validator = ImmutableBamMNVValidator.of(tumorBam);
         final MNVMerger merger = ImmutableMNVMerger.of(outputHeader);
         Pair<PotentialMNVRegion, Optional<PotentialMNVRegion>> outputPair = ImmutablePair.of(PotentialMNVRegion.empty(), Optional.empty());
         for (final VariantContext variant : vcfReader) {
