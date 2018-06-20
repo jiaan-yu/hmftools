@@ -83,11 +83,9 @@ public abstract class VcfMNVValidator implements MNVValidator {
         return mnvCandidates;
     }
 
-    static
-
     // MIVO: re-create mnv attributes from individual variants and re-build mnv variantContext using corrected alleles
     @NotNull
-    private Pair<VariantContext, PotentialMNV> patchVariant(@NotNull final VariantContext mnv,
+    private static Pair<VariantContext, PotentialMNV> patchVariant(@NotNull final VariantContext mnv,
             @NotNull final Collection<PotentialMNV> candidates, @NotNull final MNVMerger merger) {
         final List<PotentialMNV> sortedCandidates = candidates.stream().sorted(potentialMNVComparator()).collect(Collectors.toList());
         final PotentialMNV bestCandidate = sortedCandidates.get(0);
