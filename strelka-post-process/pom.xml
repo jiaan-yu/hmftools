@@ -89,6 +89,26 @@
                         </configuration>
                     </execution>
                     <execution>
+                        <id>build-strelka-post-process-patch</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <archive>
+                                <manifest>
+                                    <addClasspath>true</addClasspath>
+                                    <mainClass>com.hartwig.hmftools.strelka.PatchedStrelkaPostProcessApplication
+                                    </mainClass>
+                                </manifest>
+                            </archive>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                            <finalName>strelka-post-process-patch-${version}</finalName>
+                        </configuration>
+                    </execution>
+                    <execution>
                         <id>build-mnv-validator</id>
                         <phase>package</phase>
                         <goals>
