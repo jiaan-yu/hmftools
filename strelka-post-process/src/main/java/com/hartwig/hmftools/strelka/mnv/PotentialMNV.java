@@ -27,7 +27,7 @@ public abstract class PotentialMNV {
     public abstract List<VariantContext> variants();
 
     @NotNull
-    abstract List<Integer> gapPositions();
+    public abstract List<Integer> gapPositions();
 
     @NotNull
     static PotentialMNV addVariant(@NotNull final PotentialMNV potentialMnv, @NotNull final VariantContext variant) {
