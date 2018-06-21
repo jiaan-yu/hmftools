@@ -1,8 +1,11 @@
 package com.hartwig.hmftools.strelka.mnv;
 
+import static com.hartwig.hmftools.strelka.mnv.MNVMerger.GERMLINE_PON_FIELD;
+import static com.hartwig.hmftools.strelka.mnv.MNVMerger.SOMATIC_PON_FIELD;
+
 import java.io.File;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -13,6 +16,7 @@ import java.util.stream.Collectors;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 
@@ -22,6 +26,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import htsjdk.variant.variantcontext.VariantContext;
+import htsjdk.variant.variantcontext.VariantContextBuilder;
 import htsjdk.variant.vcf.VCFFileReader;
 
 @Value.Immutable
@@ -50,6 +55,30 @@ public abstract class VcfMNVValidator implements MNVValidator {
             return potentialMnvRegion.variants();
         } else {
             return outputVariants(potentialMnvRegion, merger);
+        }
+    }
+
+    // MIVO: outputs only patched variants (mnvs with gaps)
+    @NotNull
+    public List<VariantContext> correctedVariants(@NotNull final PotentialMNVRegion potentialMnvRegion, @NotNull final MNVMerger merger) {
+        if (potentialMnvRegion.potentialMnvs().size() == 0) {
+            return Collections.emptyList();
+        } else if (potentialMnvRegion.potentialMnvs().stream().noneMatch(potentialMNV -> potentialMNV.gapPositions().size() > 0)) {
+            return Collections.emptyList();
+        } else {
+            final List<VariantContext> result = Lists.newArrayList();
+            final Multimap<VariantContext, PotentialMNV> mnvCandidates = findMnvCandidates(potentialMnvRegion);
+            mnvCandidates.keySet().forEach(mnv -> {
+                final PotentialMNV bestCandidate = mnvCandidates.get(mnv).stream().min(potentialMNVComparator()).get();
+                final Map<String, Object> newAttributes = merger.createMnvAttributes(bestCandidate.variants());
+                final Map<String, Object> patchedAttributes = patchAttributes(mnv.getAttributes(), newAttributes);
+                if (bestCandidate.gapPositions().size() > 0) {
+                    result.add(new VariantContextBuilder(mnv).attributes(patchedAttributes).make());
+                }
+            });
+            result.sort(Comparator.comparing(VariantContext::getStart)
+                    .thenComparing(variantContext -> variantContext.getReference().length()));
+            return result;
         }
     }
 
@@ -91,8 +120,21 @@ public abstract class VcfMNVValidator implements MNVValidator {
         final PotentialMNV bestCandidate = sortedCandidates.get(0);
         final Map<String, Object> attributes = merger.createMnvAttributes(bestCandidate.variants());
         final VariantContext patchedVariant = MNVMerger.buildMnv(bestCandidate.variants(), mnv.getAlleles(), attributes);
-        assert attributesAndGenotypeEqual(patchedVariant, mnv);
         return Pair.of(patchedVariant, bestCandidate);
+    }
+
+    // MIVO: patch existing mnv attributes with pon counts
+    @NotNull
+    private static Map<String, Object> patchAttributes(@NotNull final Map<String, Object> oldAttributes,
+            @NotNull final Map<String, Object> newAttributes) {
+        final Map<String, Object> result = Maps.newHashMap(oldAttributes);
+        if (newAttributes.containsKey(SOMATIC_PON_FIELD)) {
+            result.put(SOMATIC_PON_FIELD, newAttributes.get(SOMATIC_PON_FIELD));
+        }
+        if (newAttributes.containsKey(GERMLINE_PON_FIELD)) {
+            result.put(GERMLINE_PON_FIELD, newAttributes.get(GERMLINE_PON_FIELD));
+        }
+        return result;
     }
 
     @VisibleForTesting
@@ -142,13 +184,6 @@ public abstract class VcfMNVValidator implements MNVValidator {
         final Comparator<PotentialMNV> sizeComparator = Comparator.comparing(mnv -> mnv.variants().size());
         final Comparator<PotentialMNV> startPositionComparator = Comparator.comparing(PotentialMNV::start);
         return sizeComparator.reversed().thenComparing(startPositionComparator);
-    }
-
-    private static boolean attributesAndGenotypeEqual(@NotNull final VariantContext newMnv, @NotNull final VariantContext oldMnv) {
-        final boolean attributesKept = newMnv.getAttributes().entrySet().containsAll(oldMnv.getAttributes().entrySet());
-        final boolean dpEquals = newMnv.getGenotype(0).getDP() == oldMnv.getGenotype(0).getDP();
-        final boolean adEquals = Arrays.equals(newMnv.getGenotype(0).getAD(), oldMnv.getGenotype(0).getAD());
-        return attributesKept && dpEquals && adEquals && newMnv.getGenotypes().size() == 1 && oldMnv.getGenotypes().size() == 1;
     }
 
     @Value.Immutable
