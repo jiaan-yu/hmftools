@@ -34,8 +34,8 @@ public abstract class MNVMerger {
     private static final Logger LOGGER = LogManager.getLogger(MNVMerger.class);
     private static final String MNV_SET_VALUE = "mnvs";
     private static final String MNV_SET_KEY = "set";
-    private static final String SOMATIC_PON_FIELD = "SOMATIC_PON_COUNT";
-    private static final String GERMLINE_PON_FIELD = "GERMLINE_PON_COUNT";
+    static final String SOMATIC_PON_FIELD = "SOMATIC_PON_COUNT";
+    static final String GERMLINE_PON_FIELD = "GERMLINE_PON_COUNT";
 
     @NotNull
     abstract VCFHeader vcfHeader();
