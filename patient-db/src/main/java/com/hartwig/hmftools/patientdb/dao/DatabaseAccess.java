@@ -18,6 +18,7 @@ import com.hartwig.hmftools.common.purple.purity.PurityContext;
 import com.hartwig.hmftools.common.purple.qc.PurpleQC;
 import com.hartwig.hmftools.common.purple.region.FittedRegion;
 import com.hartwig.hmftools.common.variant.EnrichedSomaticVariant;
+import com.hartwig.hmftools.common.variant.SomaticVariant;
 import com.hartwig.hmftools.common.variant.structural.EnrichedStructuralVariant;
 import com.hartwig.hmftools.common.variant.structural.StructuralVariantData;
 import com.hartwig.hmftools.patientdb.data.Patient;
@@ -119,6 +120,10 @@ public class DatabaseAccess {
 
     public void writeSomaticVariants(@NotNull final String sampleId, @NotNull List<EnrichedSomaticVariant> variants) {
         somaticVariantDAO.write(sampleId, variants);
+    }
+
+    public void updateSomaticVariantsFilters(@NotNull final String sampleId, @NotNull List<SomaticVariant> variants) {
+        somaticVariantDAO.updateFilters(sampleId, variants);
     }
 
     @NotNull

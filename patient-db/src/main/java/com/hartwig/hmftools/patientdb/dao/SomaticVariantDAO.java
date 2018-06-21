@@ -6,14 +6,17 @@ import static com.hartwig.hmftools.patientdb.database.hmfpatients.Tables.SOMATIC
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.google.common.collect.Iterables;
 import com.hartwig.hmftools.common.variant.CodingEffect;
 import com.hartwig.hmftools.common.variant.EnrichedSomaticVariant;
+import com.hartwig.hmftools.common.variant.SomaticVariant;
 
 import org.jetbrains.annotations.NotNull;
 import org.jooq.DSLContext;
 import org.jooq.InsertValuesStepN;
+import org.jooq.Query;
 
 class SomaticVariantDAO {
 
@@ -105,5 +108,24 @@ class SomaticVariantDAO {
 
     void deleteSomaticVariantForSample(@NotNull String sample) {
         context.delete(SOMATICVARIANT).where(SOMATICVARIANT.SAMPLEID.eq(sample)).execute();
+    }
+
+    void updateFilters(@NotNull final String sample, @NotNull List<SomaticVariant> variants) {
+        Timestamp timestamp = new Timestamp(new Date().getTime());
+
+        for (List<SomaticVariant> splitRegions : Iterables.partition(variants, DB_BATCH_INSERT_SIZE)) {
+            final List<Query> queries = splitRegions.stream()
+                    .filter(variant -> !variant.filter().equals("PASS"))
+                    .map(variant -> context.update(SOMATICVARIANT)
+                            .set(SOMATICVARIANT.MODIFIED, timestamp)
+                            .set(SOMATICVARIANT.FILTER, variant.filter())
+                            .where(SOMATICVARIANT.SAMPLEID.eq(sample)
+                                    .and(SOMATICVARIANT.CHROMOSOME.eq(variant.chromosome()))
+                                    .and(SOMATICVARIANT.POSITION.eq(Math.toIntExact(variant.position())))
+                                    .and(SOMATICVARIANT.REF.eq(variant.ref()))
+                                    .and(SOMATICVARIANT.ALT.eq(variant.alt()))))
+                    .collect(Collectors.toList());
+            context.batch(queries).execute();
+        }
     }
 }
