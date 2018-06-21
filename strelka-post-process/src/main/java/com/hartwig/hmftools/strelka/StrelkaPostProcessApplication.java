@@ -7,8 +7,8 @@ import java.util.Optional;
 import com.google.common.collect.Sets;
 import com.hartwig.hmftools.common.slicing.Slicer;
 import com.hartwig.hmftools.common.slicing.SlicerFactory;
+import com.hartwig.hmftools.strelka.mnv.ImmutableBamMNVValidator;
 import com.hartwig.hmftools.strelka.mnv.ImmutableMNVMerger;
-import com.hartwig.hmftools.strelka.mnv.ImmutableMNVValidator;
 import com.hartwig.hmftools.strelka.mnv.MNVDetector;
 import com.hartwig.hmftools.strelka.mnv.MNVMerger;
 import com.hartwig.hmftools.strelka.mnv.MNVValidator;
@@ -93,7 +93,7 @@ public class StrelkaPostProcessApplication {
                 .setReferenceDictionary(outputHeader.getSequenceDictionary())
                 .build();
         writer.writeHeader(outputHeader);
-        final MNVValidator validator = ImmutableMNVValidator.of(tumorBam);
+        final MNVValidator validator = ImmutableBamMNVValidator.of(tumorBam);
         final MNVMerger merger = ImmutableMNVMerger.of(outputHeader);
 
         Pair<PotentialMNVRegion, Optional<PotentialMNVRegion>> outputPair = ImmutablePair.of(PotentialMNVRegion.empty(), Optional.empty());
