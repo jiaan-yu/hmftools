@@ -34,6 +34,9 @@ public class VcfMNVValidatorTest {
     private static final VariantContext VAR_6_A_T = POTENTIAL_VARIANTS.get(6);
     private static final VariantContext VAR_7_CT_C = POTENTIAL_VARIANTS.get(7);
     private static final VariantContext VAR_9_T_A = POTENTIAL_VARIANTS.get(8);
+    private static final VariantContext VAR_10_G_A = POTENTIAL_VARIANTS.get(9);
+    private static final VariantContext VAR_11_GA_G = POTENTIAL_VARIANTS.get(10);
+    private static final VariantContext VAR_12_A_G = POTENTIAL_VARIANTS.get(11);
     private static final VariantContext MNV_1_AA_ATCATC = CORRECTED_VARIANTS.get(0);
     private static final VariantContext MNV_1_AGTCC_ATCGT = CORRECTED_VARIANTS.get(1);
     private static final VariantContext MNV_2_ATCC_ATCT = CORRECTED_VARIANTS.get(2);
@@ -45,6 +48,7 @@ public class VcfMNVValidatorTest {
     private static final VariantContext MNV_4_CGA_TGT = CORRECTED_VARIANTS.get(8);
     private static final VariantContext MNV_4_CAA_TTT = CORRECTED_VARIANTS.get(9);
     private static final VariantContext MNV_7_CTT_CA = CORRECTED_VARIANTS.get(10);
+    private static final VariantContext MNV_10_GGA_AGG = CORRECTED_VARIANTS.get(11);
 
     static {
         assertFileVariants();
@@ -57,7 +61,7 @@ public class VcfMNVValidatorTest {
         assertTrue(VcfMNVValidator.variantContainedInMnv(VAR_2_A_ATC, mnv, 0, 0));
         assertTrue(VcfMNVValidator.variantContainedInMnv(VAR_3_TCC_T, mnv, 1, 3));
         assertTrue(potentialVariantsEqualMnv(mnv, VAR_2_A_ATC, VAR_3_TCC_T));
-        //        assertFalse(potentialVariantsEqualMnv(mnv, VAR_1_A_ATC, VAR_3_TCC_T));
+        assertFalse(potentialVariantsEqualMnv(mnv, VAR_1_A_ATC, VAR_3_TCC_T));
     }
 
     // MIVO: potential: 1 (A -> ATC), 3 (TCC -> T)                              corrected: 1 (AGTCC -> ATCGT)
@@ -127,6 +131,17 @@ public class VcfMNVValidatorTest {
         assertFalse(potentialVariantsEqualMnv(mnv, VAR_4_C_T, VAR_5_G_GTTTGAC, VAR_6_A_T));
     }
 
+    // MIVO: potential: 10 (G -> A), 11 (GA -> G), 12 (A -> G)                corrected: 10 (GGA -> AGG)
+    @Test
+    public void detectsSNVAndSNVContainedInMNVWithGapSkipDel() {
+        final VariantContext mnv = MNV_10_GGA_AGG;
+        assertTrue(VcfMNVValidator.variantContainedInMnv(VAR_10_G_A, mnv, 0, 0));
+        assertTrue(VcfMNVValidator.variantContainedInMnv(VAR_12_A_G, mnv, 2, 2));
+        assertTrue(potentialVariantsEqualMnv(mnv, VAR_10_G_A, VAR_12_A_G));
+        assertFalse(potentialVariantsEqualMnv(mnv, VAR_10_G_A, VAR_11_GA_G, VAR_12_A_G));
+        assertFalse(potentialVariantsEqualMnv(mnv, VAR_10_G_A, VAR_11_GA_G));
+    }
+
     // MIVO: potential: 4 (C -> T), 5 (A -> T), 6 (A -> T)                    corrected: 4 (CAA -> TTT)
     @Test
     public void detectsSNVAndSNVAndSNVContainedInMNV() {
@@ -157,6 +172,9 @@ public class VcfMNVValidatorTest {
         assertVariant(VAR_6_A_T, 6, "A", "T");
         assertVariant(VAR_7_CT_C, 7, "CT", "C");
         assertVariant(VAR_9_T_A, 9, "T", "A");
+        assertVariant(VAR_10_G_A, 10, "G", "A");
+        assertVariant(VAR_11_GA_G, 11, "GA", "G");
+        assertVariant(VAR_12_A_G, 12, "A", "G");
         assertVariant(MNV_1_AA_ATCATC, 1, "AA", "ATCATC");
         assertVariant(MNV_1_AGTCC_ATCGT, 1, "AGTCC", "ATCGT");
         assertVariant(MNV_2_ATCC_ATCT, 2, "ATCC", "ATCT");
@@ -168,6 +186,7 @@ public class VcfMNVValidatorTest {
         assertVariant(MNV_4_CGA_TGT, 4, "CGA", "TGT");
         assertVariant(MNV_4_CAA_TTT, 4, "CAA", "TTT");
         assertVariant(MNV_7_CTT_CA, 7, "CTT", "CA");
+        assertVariant(MNV_10_GGA_AGG, 10, "GGA", "AGG");
     }
 
     private static void assertVariant(@NotNull final VariantContext variant, final int position, @NotNull final String ref,
