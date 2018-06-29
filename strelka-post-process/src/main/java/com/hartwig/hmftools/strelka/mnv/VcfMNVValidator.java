@@ -7,7 +7,6 @@ import java.io.File;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,9 +37,9 @@ public abstract class VcfMNVValidator implements MNVValidator {
 
     @NotNull
     @Value.Derived
-    protected Map<VariantKey, VariantContext> variantMap() {
+    protected Multimap<VariantKey, VariantContext> variantMap() {
         final VCFFileReader vcfReader = new VCFFileReader(new File(tumorVCF()), false);
-        final Map<VariantKey, VariantContext> variantMap = new HashMap<>();
+        final Multimap<VariantKey, VariantContext> variantMap = ArrayListMultimap.create();
         for (final VariantContext variant : vcfReader) {
             final VariantKey key = ImmutableVariantKey.of(variant.getContig(), variant.getStart(), variant.getEnd());
             variantMap.put(key, variant);
@@ -102,8 +101,7 @@ public abstract class VcfMNVValidator implements MNVValidator {
         for (final PotentialMNV potentialMnv : potentialMnvRegion.potentialMnvs()) {
             final VariantKey potentialMnvKey =
                     ImmutableVariantKey.of(potentialMnv.chromosome(), potentialMnv.start(), potentialMnv.end() - 1);
-            if (variantMap().containsKey(potentialMnvKey)) {
-                final VariantContext mnvVariant = variantMap().get(potentialMnvKey);
+            for (VariantContext mnvVariant : variantMap().get(potentialMnvKey)) {
                 if (potentialMnvMatchesCorrectedMnv(potentialMnv, mnvVariant)) {
                     mnvCandidates.put(mnvVariant, potentialMnv);
                 }
