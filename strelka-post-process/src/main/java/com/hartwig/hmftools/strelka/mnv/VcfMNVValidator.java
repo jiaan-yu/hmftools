@@ -155,7 +155,7 @@ public abstract class VcfMNVValidator implements MNVValidator {
             refPosition += potentialMnvVariant.getReference().getBaseString().length();
             altPosition += potentialMnvVariant.getAlternateAllele(0).getBaseString().length();
         }
-        return true;
+        return refPosition == mnv.getReference().length() && altPosition == mnv.getAlternateAllele(0).length();
     }
 
     private static boolean isGapPosition(@NotNull final VariantContext mnv, final int refPos, final int altPos) {
