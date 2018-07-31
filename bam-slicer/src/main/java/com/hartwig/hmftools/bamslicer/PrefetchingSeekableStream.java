@@ -1,43 +1,34 @@
 package com.hartwig.hmftools.bamslicer;
 
 import java.io.IOException;
-import java.net.URL;
-import java.util.List;
-import java.util.Map;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ExecutionException;
 
+import com.hartwig.hmftools.bamslicer.loaders.ChunkByteLoader;
+
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
-import htsjdk.samtools.Chunk;
 import htsjdk.samtools.seekablestream.SeekableStream;
-import htsjdk.samtools.util.HttpUtils;
-import okhttp3.OkHttpClient;
 
-public class CachingSeekableHTTPStream extends SeekableStream {
-    private static final Logger LOGGER = LogManager.getLogger(CachingSeekableHTTPStream.class);
+public class PrefetchingSeekableStream extends SeekableStream {
+    private static final Logger LOGGER = LogManager.getLogger(PrefetchingSeekableStream.class);
     private byte[] currentBytes = null;
-    private long currentBytesOffset = 0;
-    private long position = 0;
-    private long contentLength = -1;
-    private final ChunkHttpBuffer chunkBuffer;
+    private long currentBytesOffset = -1;
+    private long position = -1;
+    private long contentLength;
+    @NotNull
+    private final ChunkByteLoader loader;
+    @NotNull
+    private final ConcurrentSkipListMap<Long, Pair<Long, Long>> chunksLookahead;
 
-    CachingSeekableHTTPStream(@NotNull final OkHttpClient httpClient, @NotNull final URL url, @NotNull final List<Chunk> chunks,
-            final int maxBufferSize) throws IOException {
-        // Try to get the file length
-        // Note: This also sets setDefaultUseCaches(false), which is important
-        final String contentLengthString = HttpUtils.getHeaderField(url, "Content-Length");
-        if (contentLengthString != null) {
-            try {
-                contentLength = Long.parseLong(contentLengthString);
-            } catch (NumberFormatException ignored) {
-                System.err.println("WARNING: Invalid content length (" + contentLengthString + "  for: " + url);
-                contentLength = -1;
-            }
-        }
-        LOGGER.info("Caching max {} bam chunks from {}", maxBufferSize, url);
-        chunkBuffer = new ChunkHttpBuffer(httpClient, url, maxBufferSize, chunks);
-        LOGGER.info("Updating position to 0.");
+    PrefetchingSeekableStream(@NotNull final ChunkByteLoader loader, @NotNull ConcurrentSkipListMap<Long, Pair<Long, Long>> chunksLookahead,
+            final long contentLength) throws IOException {
+        this.contentLength = contentLength;
+        this.chunksLookahead = chunksLookahead;
+        this.loader = loader;
         updatePosition(0);
     }
 
@@ -60,12 +51,19 @@ public class CachingSeekableHTTPStream extends SeekableStream {
 
     private void updatePosition(final long position) throws IOException {
         if (currentBytes == null || position >= currentBytesOffset + currentBytes.length) {
-            final Map.Entry<Long, byte[]> bytesEntry = chunkBuffer.getEntryAtPosition(position);
-            if (bytesEntry.getKey() == currentBytesOffset) {
-                LOGGER.warn("Tried to seek to position {} but failed to update the current chunk.", position);
+            final Pair<Long, Long> range = nextChunkByteRange(position);
+            if (position > range.getRight()) {
+                LOGGER.error("Failed to seek to position {}. Byte range: {} - {}", position, range.getLeft(), range.getRight());
+                throw new IOException("Failed to seek to position " + position);
             }
-            currentBytesOffset = bytesEntry.getKey();
-            currentBytes = bytesEntry.getValue();
+            try {
+                LOGGER.info("Getting bytes at: {} - {}", range.getLeft(), range.getRight());
+                currentBytes = loader.getBytes(range.getLeft(), range.getRight()).get();
+                currentBytesOffset = range.getKey();
+            } catch (InterruptedException | ExecutionException e) {
+                LOGGER.error("Interrupted while seeking to position {}. Byte range: {} - {}", position, range.getLeft(), range.getRight());
+                throw new IOException("Failed to seek to position " + position);
+            }
         }
         this.position = position;
     }
@@ -100,12 +98,12 @@ public class CachingSeekableHTTPStream extends SeekableStream {
 
     @Override
     public void close() {
-        chunkBuffer.closeHttpClient();
     }
 
     @Override
     public int read() throws IOException {
         byte[] tmp = new byte[1];
+        //noinspection ResultOfMethodCallIgnored
         read(tmp, 0, 1);
         return (int) tmp[0] & 0xFF;
     }
@@ -113,6 +111,11 @@ public class CachingSeekableHTTPStream extends SeekableStream {
     @Override
     @NotNull
     public String getSource() {
-        return chunkBuffer.url().toString();
+        return loader.getSource();
+    }
+
+    @NotNull
+    private Pair<Long, Long> nextChunkByteRange(final long position) {
+        return chunksLookahead.floorEntry(position).getValue();
     }
 }
