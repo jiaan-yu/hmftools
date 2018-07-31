@@ -8,12 +8,12 @@ import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
 import okhttp3.OkHttpClient;
 
-final class SlicerHttpClient {
+public final class SlicerHttpClient {
     private SlicerHttpClient() {
     }
 
     @NotNull
-    static OkHttpClient create(final int maxRequests) {
+    public static OkHttpClient create(final int maxRequests) {
         final Dispatcher requestDispatcher = new Dispatcher();
         requestDispatcher.setMaxRequests(maxRequests);
         requestDispatcher.setMaxRequestsPerHost(maxRequests);
