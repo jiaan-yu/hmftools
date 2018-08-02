@@ -2,9 +2,6 @@ package com.hartwig.hmftools.bamslicer.clustering;
 
 import static org.junit.Assert.assertEquals;
 
-import com.hartwig.hmftools.bamslicer.clustering.ChunkDistanceMeasure;
-import com.hartwig.hmftools.bamslicer.clustering.ClusterableChunk;
-
 import org.apache.commons.math3.ml.distance.DistanceMeasure;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Test;
