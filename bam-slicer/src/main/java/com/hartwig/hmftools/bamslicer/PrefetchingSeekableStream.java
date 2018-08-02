@@ -84,27 +84,33 @@ public class PrefetchingSeekableStream extends SeekableStream {
             LOGGER.error("Attempted to copy {} bytes at offset {} into buffer of size {}", len, offset, buffer.length);
             throw new IndexOutOfBoundsException();
         }
-        if (len == 0 || position == contentLength) {
+        if (len == 0) {
             return 0;
         }
-        final int sourcePosition = (int) (position - currentBytesOffset);
-        if (sourcePosition > currentBytes.length) {
-            LOGGER.error("Attempted to copy {} bytes from offset {} from buffer of size {}", len, sourcePosition, currentBytes.length);
+        if (eof()) {
+            return -1;
         }
-        System.arraycopy(currentBytes, sourcePosition, buffer, offset, len);
-        updatePosition(position + len);
-        return len;
+        final int positionInChunk = (int) (position - currentBytesOffset);
+        int readLen = len;
+        if (positionInChunk + len > currentBytes.length) {
+            readLen = currentBytes.length - positionInChunk;
+        }
+        System.arraycopy(currentBytes, positionInChunk, buffer, offset, readLen);
+        updatePosition(position + readLen);
+        return readLen;
     }
 
     @Override
     public void close() {
+        loader.close();
     }
 
     @Override
     public int read() throws IOException {
         byte[] tmp = new byte[1];
-        //noinspection ResultOfMethodCallIgnored
-        read(tmp, 0, 1);
+        if (read(tmp, 0, 1) == -1) {
+            return -1;
+        }
         return (int) tmp[0] & 0xFF;
     }
 
