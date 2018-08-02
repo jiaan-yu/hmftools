@@ -1,6 +1,6 @@
 package com.hartwig.hmftools.bamslicer;
 
-import static htsjdk.samtools.util.BlockCompressedFilePointerUtil.MAX_BLOCK_ADDRESS;
+import static com.hartwig.hmftools.bamslicer.ChunkUtils.sliceChunks;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -10,8 +10,12 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 import com.google.common.collect.Lists;
+import com.hartwig.hmftools.bamslicer.loaders.ChunkByteLoader;
+import com.hartwig.hmftools.bamslicer.loaders.OkHttpChunkByteLoader;
+import com.hartwig.hmftools.bamslicer.loaders.PrefetchingChunkByteLoader;
 import com.hartwig.hmftools.common.region.GenomeRegion;
 import com.hartwig.hmftools.common.slicing.Slicer;
 import com.hartwig.hmftools.common.slicing.SlicerFactory;
@@ -25,6 +29,7 @@ import org.apache.commons.cli.OptionGroup;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -43,8 +48,8 @@ import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SamInputResource;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
+import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.BlockCompressedFilePointerUtil;
-import htsjdk.samtools.util.BlockCompressedStreamConstants;
 import htsjdk.samtools.util.CloseableIterator;
 import htsjdk.samtools.util.HttpUtils;
 import htsjdk.variant.variantcontext.StructuralVariantType;
@@ -57,25 +62,23 @@ public class BamSlicerApplication {
     private static final Logger LOGGER = LogManager.getLogger(BamSlicerApplication.class);
     private static final String SBP_ENDPOINT_URL = System.getenv("SBP_ENDPOINT_URL");
     private static final String SBP_PROFILE = "download";
-    private static final int S3_EXPIRATION_HOURS = 2;
 
     private static final String INPUT_MODE_S3 = "s3";
     private static final String INPUT_MODE_URL = "url";
     private static final String INPUT_MODE_FILE = "file";
     private static final String INPUT = "input";
     private static final String BUCKET = "bucket";
+    private static final String EXPIRATION_TIME = "expiration_hours";
     private static final String INDEX = "index";
     private static final String OUTPUT = "output";
     private static final String PROXIMITY = "proximity";
     private static final String VCF = "vcf";
     private static final String BED = "bed";
     private static final String UNMAPPED = "unmapped";
-    private static final String MAX_CHUNKS_IN_MEMORY = "max_chunks";
-    private static final String MAX_CHUNKS_IN_MEMORY_DEFAULT = "2000";
+    private static final String MAX_CACHE_SIZE = "max_cache_size";
+    private static final String MAX_CACHE_SIZE_DEFAULT = "4000000000";
     private static final String MAX_CONCURRENT_REQUESTS = "max_concurrent_requests";
     private static final String MAX_CONCURRENT_REQUESTS_DEFAULT = "50";
-
-    private static final Chunk HEADER_CHUNK = new Chunk(0, (long) BlockCompressedStreamConstants.MAX_COMPRESSED_BLOCK_SIZE << 16);
 
     public static void main(final String... args) throws ParseException, IOException {
         final CommandLine cmd = createCommandLine(args);
@@ -86,13 +89,13 @@ public class BamSlicerApplication {
             sliceFromVCF(cmd);
         }
         if (cmd.hasOption(INPUT_MODE_S3)) {
-            final Pair<URL, URL> urls = generateURLs(cmd);
-            sliceFromURLs(urls.getKey(), urls.getValue(), cmd);
+            final Triple<URL, URL, URL> urls = generateURLs(cmd);
+            sliceFromURLs(urls.getLeft(), urls.getMiddle(), urls.getRight(), cmd);
         }
         if (cmd.hasOption(INPUT_MODE_URL)) {
             final URL bamURL = new URL(cmd.getOptionValue(INPUT));
             final URL indexURL = new URL(cmd.getOptionValue(INDEX));
-            sliceFromURLs(indexURL, bamURL, cmd);
+            sliceFromURLs(indexURL, bamURL, bamURL, cmd);
         }
         LOGGER.info("Done.");
     }
@@ -151,18 +154,19 @@ public class BamSlicerApplication {
                         variant.getEnd() + proximity));
             }
         }
-
-        return QueryInterval.optimizeIntervals(queryIntervals.toArray(new QueryInterval[queryIntervals.size()]));
+        return QueryInterval.optimizeIntervals(queryIntervals.toArray(new QueryInterval[0]));
     }
 
     @NotNull
-    private static Pair<URL, URL> generateURLs(@NotNull final CommandLine cmd) {
+    private static Triple<URL, URL, URL> generateURLs(@NotNull final CommandLine cmd) {
         try {
+            final int s3ExpirationHours = Integer.parseInt(cmd.getOptionValue(EXPIRATION_TIME));
             LOGGER.info("Attempting to generate S3 URLs for endpoint: {} using profile: {}", SBP_ENDPOINT_URL, SBP_PROFILE);
             final S3UrlGenerator urlGenerator = ImmutableS3UrlGenerator.of(SBP_ENDPOINT_URL, SBP_PROFILE);
-            final URL indexUrl = urlGenerator.generateUrl(cmd.getOptionValue(BUCKET), cmd.getOptionValue(INDEX), S3_EXPIRATION_HOURS);
-            final URL bamUrl = urlGenerator.generateUrl(cmd.getOptionValue(BUCKET), cmd.getOptionValue(INPUT), S3_EXPIRATION_HOURS);
-            return Pair.of(indexUrl, bamUrl);
+            final URL indexUrl = urlGenerator.generateGetUrl(cmd.getOptionValue(BUCKET), cmd.getOptionValue(INDEX), s3ExpirationHours);
+            final URL bamUrl = urlGenerator.generateGetUrl(cmd.getOptionValue(BUCKET), cmd.getOptionValue(INPUT), s3ExpirationHours);
+            final URL bamHeadUrl = urlGenerator.generateHeadUrl(cmd.getOptionValue(BUCKET), cmd.getOptionValue(INPUT), s3ExpirationHours);
+            return Triple.of(indexUrl, bamUrl, bamHeadUrl);
         } catch (Exception e) {
             LOGGER.error("Could not create S3 URLs. Error: {}", e.toString());
             LOGGER.error("You must run this with the sbp user or set up aws credentials and the SBP_ENDPOINT_URL environment variable");
@@ -171,7 +175,8 @@ public class BamSlicerApplication {
         return null;
     }
 
-    private static void sliceFromURLs(@NotNull final URL indexUrl, @NotNull final URL bamUrl, @NotNull final CommandLine cmd)
+    private static void sliceFromURLs(@NotNull final URL indexUrl, @NotNull final URL bamUrl, @NotNull final URL bamHeadUrl,
+            @NotNull final CommandLine cmd)
             throws IOException {
         final File indexFile = downloadIndex(indexUrl);
         indexFile.deleteOnExit();
@@ -182,7 +187,8 @@ public class BamSlicerApplication {
         final Optional<Pair<QueryInterval[], BAMFileSpan>> queryIntervalsAndSpan = queryIntervalsAndSpan(reader, bamIndex, cmd);
         final Optional<Chunk> unmappedChunk = getUnmappedChunk(bamIndex, HttpUtils.getHeaderField(bamUrl, "Content-Length"), cmd);
         final List<Chunk> sliceChunks = sliceChunks(queryIntervalsAndSpan, unmappedChunk);
-        final SamReader cachingReader = createCachingReader(indexFile, bamUrl, cmd, sliceChunks);
+        final SamReader cachingReader = createCachingReader(indexFile, bamUrl, bamHeadUrl, cmd, sliceChunks);
+        LOGGER.info("Created caching reader..");
         queryIntervalsAndSpan.ifPresent(pair -> {
             LOGGER.info("Slicing bam on bed regions...");
             final CloseableIterator<SAMRecord> bedIterator = getIterator(cachingReader, pair.getKey(), pair.getValue().toCoordinateArray());
@@ -213,40 +219,19 @@ public class BamSlicerApplication {
         return Optional.empty();
     }
 
-    private static SamReader createCachingReader(@NotNull final File indexFile, @NotNull final URL bamUrl, @NotNull final CommandLine cmd,
+    private static SamReader createCachingReader(@NotNull final File indexFile, @NotNull final URL bamUrl, @NotNull final URL bamHeadUrl,
+            @NotNull final CommandLine cmd,
             @NotNull final List<Chunk> sliceChunks) throws IOException {
         final OkHttpClient httpClient =
                 SlicerHttpClient.create(Integer.parseInt(cmd.getOptionValue(MAX_CONCURRENT_REQUESTS, MAX_CONCURRENT_REQUESTS_DEFAULT)));
-        final int maxBufferSize = readMaxBufferSize(cmd);
-        final SamInputResource bamResource =
-                SamInputResource.of(new CachingSeekableHTTPStream(httpClient, bamUrl, sliceChunks, maxBufferSize)).index(indexFile);
+        final long maxCacheSize = readMaxBufferSize(cmd);
+        final ConcurrentSkipListMap<Long, Pair<Long, Long>> chunksLookahead = buildLookaheadMap(sliceChunks);
+        final OkHttpChunkByteLoader okHttpLoader = new OkHttpChunkByteLoader(httpClient, bamUrl, bamHeadUrl);
+        final ChunkByteLoader loader = new PrefetchingChunkByteLoader(okHttpLoader, maxCacheSize, chunksLookahead);
+        final SeekableStream bamStream = new PrefetchingSeekableStream(loader, chunksLookahead, okHttpLoader.contentLength());
+        final SamInputResource bamResource = SamInputResource.of(bamStream).index(indexFile);
+        LOGGER.info("Created caching bam resource.");
         return SamReaderFactory.makeDefault().open(bamResource);
-    }
-
-    @NotNull
-    private static List<Chunk> sliceChunks(@NotNull final Optional<Pair<QueryInterval[], BAMFileSpan>> queryIntervalsAndSpan,
-            @NotNull final Optional<Chunk> unmappedChunk) {
-        final List<Chunk> chunks = Lists.newArrayList();
-        chunks.add(HEADER_CHUNK);
-        queryIntervalsAndSpan.ifPresent(pair -> {
-            chunks.addAll(expandChunks(pair.getValue().getChunks()));
-            LOGGER.info("Generated {} query intervals which map to {} bam chunks", pair.getKey().length, chunks.size());
-        });
-        unmappedChunk.ifPresent(chunks::add);
-        return Chunk.optimizeChunkList(chunks, 0);
-    }
-
-    @NotNull
-    private static List<Chunk> expandChunks(@NotNull final List<Chunk> chunks) {
-        final List<Chunk> result = Lists.newArrayList();
-        for (final Chunk chunk : chunks) {
-            final long chunkEndBlockAddress = BlockCompressedFilePointerUtil.getBlockAddress(chunk.getChunkEnd());
-            final long extendedEndBlockAddress = chunkEndBlockAddress + BlockCompressedStreamConstants.MAX_COMPRESSED_BLOCK_SIZE;
-            final long newChunkEnd = extendedEndBlockAddress > MAX_BLOCK_ADDRESS ? MAX_BLOCK_ADDRESS : extendedEndBlockAddress;
-            final long chunkEndVirtualPointer = newChunkEnd << 16;
-            result.add(new Chunk(chunk.getChunkStart(), chunkEndVirtualPointer));
-        }
-        return result;
     }
 
     @NotNull
@@ -291,7 +276,7 @@ public class BamSlicerApplication {
         for (final GenomeRegion region : bedSlicer.regions()) {
             queryIntervals.add(new QueryInterval(header.getSequenceIndex(region.chromosome()), (int) region.start(), (int) region.end()));
         }
-        return QueryInterval.optimizeIntervals(queryIntervals.toArray(new QueryInterval[queryIntervals.size()]));
+        return QueryInterval.optimizeIntervals(queryIntervals.toArray(new QueryInterval[0]));
     }
 
     @NotNull
@@ -320,10 +305,10 @@ public class BamSlicerApplication {
         iterator.close();
     }
 
-    private static int readMaxBufferSize(@NotNull final CommandLine cmd) {
-        final String optionValue = cmd.getOptionValue(MAX_CHUNKS_IN_MEMORY, MAX_CHUNKS_IN_MEMORY_DEFAULT);
+    private static long readMaxBufferSize(@NotNull final CommandLine cmd) {
+        final String optionValue = cmd.getOptionValue(MAX_CACHE_SIZE, MAX_CACHE_SIZE_DEFAULT);
         try {
-            final int bufferSize = Integer.parseInt(optionValue);
+            final long bufferSize = Long.parseLong(optionValue);
             if (bufferSize <= 0) {
                 throw new IllegalArgumentException("Buffer size cannot be <= 0.");
             }
@@ -331,6 +316,17 @@ public class BamSlicerApplication {
         } catch (final NumberFormatException e) {
             throw new IllegalArgumentException("Could not parse buffer size");
         }
+    }
+
+    @NotNull
+    private static ConcurrentSkipListMap<Long, Pair<Long, Long>> buildLookaheadMap(@NotNull final List<Chunk> chunks) {
+        final ConcurrentSkipListMap<Long, Pair<Long, Long>> chunksPerOffset = new ConcurrentSkipListMap<>();
+        for (final Chunk chunk : chunks) {
+            final long chunkStart = BlockCompressedFilePointerUtil.getBlockAddress(chunk.getChunkStart());
+            final long chunkEnd = BlockCompressedFilePointerUtil.getBlockAddress(chunk.getChunkEnd());
+            chunksPerOffset.put(chunkStart, Pair.of(chunkStart, chunkEnd));
+        }
+        return chunksPerOffset;
     }
 
     @NotNull
@@ -360,6 +356,7 @@ public class BamSlicerApplication {
         options.addOption(Option.builder(BUCKET).required().hasArg().desc("s3 bucket for BAM and index files (required)").build());
         options.addOption(Option.builder(INPUT).required().hasArg().desc("s3 BAM file location (required)").build());
         options.addOption(Option.builder(INDEX).required().hasArg().desc("s3 BAM index location (required)").build());
+        options.addOption(Option.builder(EXPIRATION_TIME).required().hasArg().desc("s3 url expiration time (hours, integer)").build());
         return addHttpSlicerOptions(options);
     }
 
@@ -368,9 +365,8 @@ public class BamSlicerApplication {
         options.addOption(Option.builder(OUTPUT).required().hasArg().desc("The output BAM (required)").build());
         options.addOption(Option.builder(BED).hasArg().desc("BED to slice BAM with").build());
         options.addOption(Option.builder(UNMAPPED).desc("Slice unmapped reads").build());
-        options.addOption(Option.builder(MAX_CHUNKS_IN_MEMORY)
-                .hasArg()
-                .desc("Max number of chunks to keep in memory (default: " + MAX_CHUNKS_IN_MEMORY_DEFAULT + ")")
+        options.addOption(Option.builder(MAX_CACHE_SIZE)
+                .hasArg().desc("Max chunk cache size (bytes) (default: " + MAX_CACHE_SIZE_DEFAULT + ")")
                 .build());
         options.addOption(Option.builder(MAX_CONCURRENT_REQUESTS)
                 .hasArg()
