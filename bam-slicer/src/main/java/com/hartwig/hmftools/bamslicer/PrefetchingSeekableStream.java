@@ -29,7 +29,7 @@ public class PrefetchingSeekableStream extends SeekableStream {
         this.contentLength = contentLength;
         this.chunksLookahead = chunksLookahead;
         this.loader = loader;
-        updatePosition(0);
+        seek(0);
     }
 
     @Override
@@ -45,27 +45,8 @@ public class PrefetchingSeekableStream extends SeekableStream {
     @Override
     public long skip(long n) throws IOException {
         long bytesToSkip = Math.min(n, contentLength - position);
-        updatePosition(position + bytesToSkip);
+        seek(position + bytesToSkip);
         return bytesToSkip;
-    }
-
-    private void updatePosition(final long position) throws IOException {
-        if (currentBytes == null || position >= currentBytesOffset + currentBytes.length) {
-            final Pair<Long, Long> range = nextChunkByteRange(position);
-            if (position > range.getRight()) {
-                LOGGER.error("Failed to seek to position {}. Byte range: {} - {}", position, range.getLeft(), range.getRight());
-                throw new IOException("Failed to seek to position " + position);
-            }
-            try {
-                LOGGER.info("Getting bytes at: {} - {}", range.getLeft(), range.getRight());
-                currentBytes = loader.getBytes(range.getLeft(), range.getRight()).get();
-                currentBytesOffset = range.getKey();
-            } catch (InterruptedException | ExecutionException e) {
-                LOGGER.error("Interrupted while seeking to position {}. Byte range: {} - {}", position, range.getLeft(), range.getRight());
-                throw new IOException("Failed to seek to position " + position);
-            }
-        }
-        this.position = position;
     }
 
     @Override
@@ -75,7 +56,23 @@ public class PrefetchingSeekableStream extends SeekableStream {
 
     @Override
     public void seek(final long position) throws IOException {
-        updatePosition(position);
+        if (currentBytes == null || position >= currentBytesOffset + currentBytes.length) {
+            final Pair<Long, Long> range = nextChunkByteRange(position);
+            if (position <= range.getRight()) {
+                try {
+                    LOGGER.info("Getting bytes at: {} - {}", range.getLeft(), range.getRight());
+                    currentBytes = loader.getBytes(range.getLeft(), range.getRight()).get();
+                    LOGGER.info("Got {} bytes at: {} - {}", currentBytes.length, range.getLeft(), range.getRight());
+                    currentBytesOffset = range.getKey();
+                } catch (InterruptedException e) {
+                    throw new IOException(
+                            "Interrupted while seeking to " + position + ". Byte range: " + range.getLeft() + " - " + range.getRight());
+                } catch (ExecutionException e) {
+                    throw new IOException("Execution exception raised while seeking to " + position + ". Cause: " + e.getMessage());
+                }
+            }
+        }
+        this.position = position;
     }
 
     @Override
@@ -96,7 +93,7 @@ public class PrefetchingSeekableStream extends SeekableStream {
             readLen = currentBytes.length - positionInChunk;
         }
         System.arraycopy(currentBytes, positionInChunk, buffer, offset, readLen);
-        updatePosition(position + readLen);
+        seek(position + readLen);
         return readLen;
     }
 
