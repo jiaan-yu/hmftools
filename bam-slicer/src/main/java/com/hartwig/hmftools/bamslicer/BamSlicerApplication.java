@@ -366,7 +366,8 @@ public class BamSlicerApplication {
         options.addOption(Option.builder(BED).hasArg().desc("BED to slice BAM with").build());
         options.addOption(Option.builder(UNMAPPED).desc("Slice unmapped reads").build());
         options.addOption(Option.builder(MAX_CACHE_SIZE)
-                .hasArg().desc("Max chunk cache size (bytes) (default: " + MAX_CACHE_SIZE_DEFAULT + ")")
+                .hasArg()
+                .desc("Max chunk cache size (bytes) (default: " + MAX_CACHE_SIZE_DEFAULT + ")")
                 .build());
         options.addOption(Option.builder(MAX_CONCURRENT_REQUESTS)
                 .hasArg()
