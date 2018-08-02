@@ -79,7 +79,7 @@ public class OkHttpChunkByteLoader implements ChunkByteLoader {
                 response.close();
             }
         }
-        LOGGER.error("Could not retrieve valid content length for {}", url);
+        LOGGER.error("Could not retrieve valid content length for {}", headUrl);
         LOGGER.error("Response {}: {}", response.code(), response.message());
         response.close();
         return -1;
