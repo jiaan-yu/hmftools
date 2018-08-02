@@ -38,9 +38,20 @@ abstract class S3UrlGenerator {
     }
 
     @NotNull
-    URL generateUrl(@NotNull final String bucketName, @NotNull final String objectKey, final int expirationHours) throws IOException {
+    URL generateHeadUrl(@NotNull final String bucketName, @NotNull final String objectKey, final int expirationHours) throws IOException {
+        return generateUrl(bucketName, objectKey, HttpMethod.HEAD, expirationHours);
+    }
+
+    @NotNull
+    URL generateGetUrl(@NotNull final String bucketName, @NotNull final String objectKey, final int expirationHours) throws IOException {
+        return generateUrl(bucketName, objectKey, HttpMethod.GET, expirationHours);
+    }
+
+    @NotNull
+    private URL generateUrl(@NotNull final String bucketName, @NotNull final String objectKey, @NotNull final HttpMethod httpMethod,
+            final int expirationHours) throws IOException {
         try {
-            LOGGER.info("Generating pre-signed URL for bucket: {}\tobject: {}\texpirationTime: {} hours",
+            LOGGER.info("Generating pre-signed URL for {}\tbucket: {}\tobject: {}\texpirationTime: {} hours", httpMethod,
                     bucketName,
                     objectKey,
                     expirationHours);
@@ -48,7 +59,7 @@ abstract class S3UrlGenerator {
             final long expirationMillis = millisNow + 1000 * 60 * 60 * expirationHours;
             final Date expiration = new java.util.Date(expirationMillis);
             final GeneratePresignedUrlRequest generatePresignedUrlRequest = new GeneratePresignedUrlRequest(bucketName, objectKey);
-            generatePresignedUrlRequest.setMethod(HttpMethod.GET);
+            generatePresignedUrlRequest.setMethod(httpMethod);
             generatePresignedUrlRequest.setExpiration(expiration);
 
             return s3Client().generatePresignedUrl(generatePresignedUrlRequest);
@@ -64,4 +75,5 @@ abstract class S3UrlGenerator {
         }
         throw new IOException("Failed to create sbp URL.");
     }
+
 }
