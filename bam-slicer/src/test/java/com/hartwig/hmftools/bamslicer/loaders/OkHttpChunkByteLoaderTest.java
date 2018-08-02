@@ -2,6 +2,7 @@ package com.hartwig.hmftools.bamslicer.loaders;
 
 import static org.junit.Assert.assertEquals;
 
+import java.net.URL;
 import java.util.concurrent.ExecutionException;
 
 import com.hartwig.hmftools.bamslicer.SlicerHttpClient;
@@ -19,7 +20,8 @@ public class OkHttpChunkByteLoaderTest {
         server.enqueue(new MockResponse().setHeader("Content-Length", 200));
         server.start();
 
-        final OkHttpChunkByteLoader httpLoader = new OkHttpChunkByteLoader(SlicerHttpClient.create(1), server.url("/test").url());
+        final URL serverUrl = server.url("/test").url();
+        final OkHttpChunkByteLoader httpLoader = new OkHttpChunkByteLoader(SlicerHttpClient.create(1), serverUrl, serverUrl);
         assertEquals(200, httpLoader.contentLength());
         server.shutdown();
     }
@@ -30,7 +32,8 @@ public class OkHttpChunkByteLoaderTest {
         server.enqueue(new MockResponse().setBody(new Buffer().write(new byte[] { 42 })));
         server.start();
 
-        final OkHttpChunkByteLoader httpLoader = new OkHttpChunkByteLoader(SlicerHttpClient.create(1), server.url("/test").url());
+        final URL serverUrl = server.url("/test").url();
+        final OkHttpChunkByteLoader httpLoader = new OkHttpChunkByteLoader(SlicerHttpClient.create(1), serverUrl, serverUrl);
         assertEquals(1, httpLoader.getBytes(50, 10).get().length);              //MIVO: should throw due to illegal arguments
         server.shutdown();
     }
@@ -41,7 +44,8 @@ public class OkHttpChunkByteLoaderTest {
         server.enqueue(new MockResponse().setBody(new Buffer().write(new byte[] { 42 })));
         server.start();
 
-        final OkHttpChunkByteLoader httpLoader = new OkHttpChunkByteLoader(SlicerHttpClient.create(1), server.url("/test").url());
+        final URL serverUrl = server.url("/test").url();
+        final OkHttpChunkByteLoader httpLoader = new OkHttpChunkByteLoader(SlicerHttpClient.create(1), serverUrl, serverUrl);
         assertEquals(1, httpLoader.getBytes(0, 10).get().length);
         server.shutdown();
     }

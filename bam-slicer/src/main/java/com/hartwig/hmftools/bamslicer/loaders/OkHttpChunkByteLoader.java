@@ -21,18 +21,21 @@ public class OkHttpChunkByteLoader implements ChunkByteLoader {
     @NotNull
     private final URL url;
     @NotNull
+    private final URL headUrl;
+    @NotNull
     private final OkHttpClient httpClient;
 
-    public OkHttpChunkByteLoader(@NotNull final OkHttpClient httpClient, @NotNull final URL url) {
+    public OkHttpChunkByteLoader(@NotNull final OkHttpClient httpClient, @NotNull final URL url, @NotNull final URL headUrl) {
         this.httpClient = httpClient;
         this.url = url;
+        this.headUrl = headUrl;
     }
 
     @Override
     @NotNull
     public ListenableFuture<byte[]> getBytes(final long start, final long end) {
         if (start <= end) {
-            return readUrlBytes(start, end - start);
+            return readUrlBytes(start, end - start + 1);
         } else {
             return Futures.immediateFailedFuture(new IllegalArgumentException("start offset is greater than end"));
         }
@@ -64,13 +67,21 @@ public class OkHttpChunkByteLoader implements ChunkByteLoader {
     }
 
     public long contentLength() throws IOException {
-        final Request headRequest = new Request.Builder().url(url).head().build();
+        final Request headRequest = new Request.Builder().url(headUrl).head().build();
         final Response response = httpClient.newCall(headRequest).execute();
-        try {
-            return Long.parseLong(response.header("Content-Length"));
-        } catch (NumberFormatException ignored) {
+        if (response.isSuccessful()) {
+            try {
+                final long contentLength = Long.parseLong(response.header("Content-Length"));
+                LOGGER.info("Setting content length to {}", contentLength);
+                return contentLength;
+            } catch (NumberFormatException ignored) {
+            } finally {
+                response.close();
+            }
         }
-        LOGGER.error("Invalid content length for: " + url);
+        LOGGER.error("Could not retrieve valid content length for {}", url);
+        LOGGER.error("Response {}: {}", response.code(), response.message());
+        response.close();
         return -1;
     }
 }
