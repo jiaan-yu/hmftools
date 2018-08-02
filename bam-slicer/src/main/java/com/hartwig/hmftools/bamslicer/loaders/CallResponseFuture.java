@@ -1,6 +1,7 @@
 package com.hartwig.hmftools.bamslicer.loaders;
 
 import java.io.IOException;
+import java.util.concurrent.RejectedExecutionException;
 
 import com.google.common.util.concurrent.AbstractFuture;
 
@@ -69,6 +70,10 @@ public class CallResponseFuture extends AbstractFuture<byte[]> {
 
     private CallResponseFuture(@NotNull final Call call, final int retryCount) {
         this.underlyingCall = call;
-        underlyingCall.enqueue(retryingCallback(retryCount));
+        try {
+            underlyingCall.enqueue(retryingCallback(retryCount));
+        } catch (RejectedExecutionException e) {
+            setException(new IOException("Failed to enqueue network call", e));
+        }
     }
 }
