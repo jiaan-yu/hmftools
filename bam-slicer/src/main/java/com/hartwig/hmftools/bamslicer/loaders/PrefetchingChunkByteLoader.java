@@ -1,6 +1,7 @@
 package com.hartwig.hmftools.bamslicer.loaders;
 
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
@@ -23,9 +24,11 @@ public class PrefetchingChunkByteLoader implements ChunkByteLoader {
 
     private final double fillSize;
 
+    private final AtomicReference<Pair<Long, Long>> midPrefetchedRange = new AtomicReference<>(null);
+
     public PrefetchingChunkByteLoader(@NotNull final ChunkByteLoader loader, final long maxCacheSize,
             @NotNull final ConcurrentSkipListMap<Long, Pair<Long, Long>> chunksLookahead) {
-        this.fillSize = maxCacheSize * .5;
+        this.fillSize = maxCacheSize * .8;
         this.chunksLookahead = chunksLookahead;
         this.loader = loader;
         this.cache = CacheBuilder.newBuilder()
@@ -33,26 +36,27 @@ public class PrefetchingChunkByteLoader implements ChunkByteLoader {
                 .maximumWeight(maxCacheSize)
                 .weigher(cachedChunkWeigher())
                 .removalListener(removalNotification -> {
-                    LOGGER.info("Evicting {}", removalNotification.getKey().getLeft());
                     removalNotification.getValue().cancel(true);
                 })
                 .build(new PrefetchingCacheLoader(loader));
     }
 
     private void prefetch(final long position) {
+        midPrefetchedRange.set(null);
         final long chunkOffset = chunksLookahead.floorEntry(position).getKey();
-        LOGGER.info("refilling cache starting at offset: {}", chunkOffset);
         double runningSize = 0;
-        for (final Pair<Long, Long> range : chunksLookahead.tailMap(chunkOffset, false).values()) {
+        for (final Pair<Long, Long> range : chunksLookahead.tailMap(chunkOffset, true).values()) {
             runningSize += rangeSize(range);
             if (runningSize >= fillSize) {
                 break;
+            }
+            if (midPrefetchedRange.get() == null && runningSize > fillSize / 2) {
+                midPrefetchedRange.set(range);
             }
             if (cache.getIfPresent(range) == null) {
                 cache.refresh(range);
             }
         }
-        LOGGER.info("done refilling cache starting at offset: {}", chunkOffset);
     }
 
     @NotNull
@@ -71,9 +75,20 @@ public class PrefetchingChunkByteLoader implements ChunkByteLoader {
         if (cache.getIfPresent(range) == null) {
             LOGGER.info("Cache miss at range: {} - {}", start, end);
             cache.refresh(range);
+            prefetch(start);
+        } else if (range.equals(midPrefetchedRange.get())) {
+            invalidateBefore(range);
+            prefetch(start);
         }
-        prefetch(start);
         return cache.getUnchecked(range);
+    }
+
+    private void invalidateBefore(@NotNull final Pair<Long, Long> range) {
+        cache.asMap().keySet().forEach(cachedRange -> {
+            if (cachedRange.getLeft() < range.getLeft()) {
+                cache.invalidate(cachedRange);
+            }
+        });
     }
 
     @Override
