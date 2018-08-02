@@ -60,9 +60,7 @@ public class PrefetchingSeekableStream extends SeekableStream {
             final Pair<Long, Long> range = nextChunkByteRange(position);
             if (position <= range.getRight()) {
                 try {
-                    LOGGER.info("Getting bytes at: {} - {}", range.getLeft(), range.getRight());
                     currentBytes = loader.getBytes(range.getLeft(), range.getRight()).get();
-                    LOGGER.info("Got {} bytes at: {} - {}", currentBytes.length, range.getLeft(), range.getRight());
                     currentBytesOffset = range.getKey();
                 } catch (InterruptedException e) {
                     throw new IOException(
