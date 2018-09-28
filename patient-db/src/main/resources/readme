@@ -1,12 +1,12 @@
 Run the following commands as root (admin) on mysql prior to building
 
-mysql> CREATE USER 'build'@'localhost' IDENTIFIED BY 'build';
+mysql> CREATE USER 'build'@'localhost' IDENTIFIED BY 'BuildIt!1';
 Query OK, 0 rows affected (0.00 sec)
 
-mysql> CREATE DATABASE hmfpatients;
+mysql> CREATE DATABASE hmfpatientsbuild;
 Query OK, 1 row affected (0.00 sec)
 
-mysql> GRANT ALL on hmfpatients.* TO 'build'@'localhost';
+mysql> GRANT ALL on hmfpatientsbuild.* TO 'build'@'localhost';
 Query OK, 0 rows affected (0.00 sec)
 
 Maven automatically rebuilds the hmfpatient database based on DDL statements provided 
@@ -20,9 +20,9 @@ Create mysql.login file:
 
 cat ~/mysql.login << HERE
 [client]
-database=hmfpatients
+database=hmfpatientsbuild
 user=build
-password=build
+password=BuildIt!1
 HERE
 
 For MySQL to accept the login file, make sure that the login file is only readable by you:
